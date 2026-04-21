@@ -5075,6 +5075,8 @@ async function doSignIn() {
     }
 
     currentUser = data.user;
+    closeAuth(); // Close modal immediately on successful auth
+
     await loadProfile();
 
     // Check approval status
@@ -5082,20 +5084,17 @@ async function doSignIn() {
     if (status === 'pending') {
       await sb.auth.signOut();
       currentUser = null; userProfile = null;
-      closeAuth();
       openAuth('pending');
       return;
     }
     if (status === 'rejected') {
       await sb.auth.signOut();
       currentUser = null; userProfile = null;
-      closeAuth();
       openAuth('rejected');
       return;
     }
 
     await loadTransactions();
-    closeAuth();
     showApp();
   } finally {
     setLoading('btn-signin', false);

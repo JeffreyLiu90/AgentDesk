@@ -213,12 +213,12 @@
       padding-top: 2rem;
     }
     .hero-stat {
-      flex: 1; max-width: 180px; text-align: center;
-      padding: 0 2rem;
+      flex: 1; min-width: 0; text-align: center;
+      padding: 0 1.5rem;
       border-right: 1px solid var(--border);
     }
     .hero-stat:last-child { border-right: none; }
-    .hero-stat-num { font-size: 1.8rem; font-weight: 900; color: var(--navy); }
+    .hero-stat-num { font-size: clamp(1.1rem, 2.2vw, 1.8rem); font-weight: 900; color: var(--navy); word-break: break-word; }
     .hero-stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.2rem; }
 
     /* Features */
@@ -5018,7 +5018,11 @@ function openAuth(tab) {
   $('auth-overlay').classList.remove('hidden');
   switchAuth(tab);
 }
-function closeAuth() { $('auth-overlay').classList.add('hidden'); }
+function closeAuth() {
+  $('auth-overlay').classList.add('hidden');
+  setLoading('btn-signin', false);
+  setLoading('btn-signup', false);
+}
 function switchAuth(tab) {
   ['signin','signup','verify','pending','rejected'].forEach(t => {
     const el = $('form-' + t);
@@ -5059,36 +5063,41 @@ async function doSignIn() {
   }
 
   setLoading('btn-signin', true);
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  setLoading('btn-signin', false);
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
 
-  if (error) {
-    showAuthError('signin', error.message === 'Invalid login credentials'
-      ? 'Incorrect email or password.' : error.message);
-    return;
+    if (error) {
+      showAuthError('signin', error.message === 'Invalid login credentials'
+        ? 'Incorrect email or password.' : error.message);
+      return;
+    }
+
+    currentUser = data.user;
+    await loadProfile();
+
+    // Check approval status
+    const status = userProfile?.approval_status;
+    if (status === 'pending') {
+      await sb.auth.signOut();
+      currentUser = null; userProfile = null;
+      closeAuth();
+      openAuth('pending');
+      return;
+    }
+    if (status === 'rejected') {
+      await sb.auth.signOut();
+      currentUser = null; userProfile = null;
+      closeAuth();
+      openAuth('rejected');
+      return;
+    }
+
+    await loadTransactions();
+    closeAuth();
+    showApp();
+  } finally {
+    setLoading('btn-signin', false);
   }
-
-  currentUser = data.user;
-  await loadProfile();
-
-  // Check approval status
-  const status = userProfile?.approval_status;
-  if (status === 'pending') {
-    await sb.auth.signOut();
-    currentUser = null; userProfile = null;
-    openAuth('pending');
-    return;
-  }
-  if (status === 'rejected') {
-    await sb.auth.signOut();
-    currentUser = null; userProfile = null;
-    openAuth('rejected');
-    return;
-  }
-
-  await loadTransactions();
-  closeAuth();
-  showApp();
 }
 
 async function doSignUp() {

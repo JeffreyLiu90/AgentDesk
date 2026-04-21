@@ -4961,6 +4961,7 @@ async function bootstrap() {
         return;
       }
       await loadTransactions();
+      closeAuth();
       showApp();
     }
     if (event === 'SIGNED_OUT') {
@@ -4990,6 +4991,7 @@ async function loadTransactions() {
 }
 
 function showApp() {
+  closeAuth();
   hidePage('page-loader');
   hidePage('landing-page');
   showPage('app');

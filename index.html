@@ -661,7 +661,7 @@
     .modal-title { font-size: var(--text-xl); font-weight: var(--fw-black); margin-bottom: 1.4rem; }
 
     /* Resale View */
-    #view-resale { padding: 2rem 3.5%; }
+    #view-resale, #view-lease, #view-preconstruction, #view-market, #view-analyzer { padding: 2rem 3.5%; }
     .view-topbar { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.8rem; }
     .breadcrumb { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--sp-1); }
     .breadcrumb span:last-child { color: var(--navy); font-weight: var(--fw-semi); }
@@ -9758,13 +9758,13 @@ function updateDashStats() {
   // Active deals from resale + lease
   const yr = new Date().getFullYear();
   const resaleActive = transactions.filter(t => !t.isPaid && t.year === yr).length;
-  const leaseActive  = leaseTransactions.filter(t => !t.isPaid && Number(t.year||t.startDate?.slice(0,4)) === yr).length;
-  const outstanding  = [...transactions,...leaseTransactions].filter(t => !t.isPaid).reduce((s,t) => {
-    const calc = typeof calcLeaseComm === 'function' && t.monthlyRent ? calcLeaseComm(t).agent : calcComm?.(t)?.agent || 0;
+  const leaseActive  = leaseTxs.filter(t => !t.isPaid && Number(t.year||t.startDate?.slice(0,4)) === yr).length;
+  const outstanding  = [...transactions,...leaseTxs].filter(t => !t.isPaid).reduce((s,t) => {
+    const calc = t.monthlyRent ? calcLeaseComm(t).userNet : calcComm(t).userNet;
     return s + calc;
   }, 0);
-  const earned = [...transactions,...leaseTransactions].filter(t => t.isPaid && (t.year===yr || Number(t.year||t.startDate?.slice(0,4))===yr)).reduce((s,t) => {
-    const calc = typeof calcLeaseComm === 'function' && t.monthlyRent ? calcLeaseComm(t).agent : calcComm?.(t)?.agent || 0;
+  const earned = [...transactions,...leaseTxs].filter(t => t.isPaid && (t.year===yr || Number(t.year||t.startDate?.slice(0,4))===yr)).reduce((s,t) => {
+    const calc = t.monthlyRent ? calcLeaseComm(t).userNet : calcComm(t).userNet;
     return s + calc;
   }, 0);
 

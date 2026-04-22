@@ -3568,21 +3568,28 @@
       </div>
 
       <div class="sec-divider">💰 Commission</div>
-      <div class="pf-info-box">Lease commissions in Ontario are typically calculated as a percentage of the <strong>annual rent</strong> (monthly × 12), or as a flat amount. The most common rate is 4% of annual rent split between both agents.</div>
+      <div class="pf-info-box">Lease commissions are typically calculated as a percentage of the <strong>1st month's rent</strong> (e.g. 50% of 1st month), or as a flat amount. Kickbacks can be a flat dollar deduction or a percentage of gross commission.</div>
 
       <div style="margin-bottom:.8rem">
         <div style="font-size:.8rem;font-weight:700;margin-bottom:.5rem">Commission Type</div>
         <div class="comm-type-row">
-          <button class="ctype-btn active" id="lct-pct"  onclick="setLeaseCommType('pct')">% of Annual Rent</button>
+          <button class="ctype-btn active" id="lct-pct"  onclick="setLeaseCommType('pct')">% of 1st Month Rent</button>
           <button class="ctype-btn"        id="lct-flat" onclick="setLeaseCommType('flat')">Fixed Amount ($)</button>
         </div>
       </div>
       <div class="form-row">
         <div class="fg"><label id="lf-comm-label">Commission Rate (%) *</label>
-          <input type="number" id="lf-comm" placeholder="4" step="0.01" min="0" oninput="leasePreview()" />
+          <input type="number" id="lf-comm" placeholder="50" step="0.01" min="0" oninput="leasePreview()" />
         </div>
-        <div class="fg"><label>Kickback Amount ($)</label>
-          <input type="number" id="lf-kickback" placeholder="0" min="0" oninput="leasePreview()" />
+        <div class="fg">
+          <label>Kickback</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <div class="comm-type-row" style="margin:0;flex-shrink:0">
+              <button class="ctype-btn active" id="lkt-dollar" onclick="setLeaseKickType('dollar')" style="padding:.3rem .6rem;font-size:.75rem">$</button>
+              <button class="ctype-btn"        id="lkt-pct"    onclick="setLeaseKickType('pct')"    style="padding:.3rem .6rem;font-size:.75rem">%</button>
+            </div>
+            <input type="number" id="lf-kickback" placeholder="0" min="0" style="flex:1" oninput="leasePreview()" />
+          </div>
         </div>
       </div>
 
@@ -3780,6 +3787,7 @@ function rowToTx(row) {
     address:       row.address,
     clientName:    row.client_name,
     type:          row.type,
+    category:      row.category || '',
     purchasePrice: row.purchase_price,
     closingDate:   row.closing_date,
     commType:      row.comm_type,
@@ -3799,6 +3807,7 @@ function txToRow(t, userId) {
     address:        t.address,
     client_name:    t.clientName,
     type:           t.type,
+    category:       t.category || '',
     purchase_price: t.purchasePrice,
     closing_date:   t.closingDate,
     comm_type:      t.commType,
@@ -6389,6 +6398,7 @@ let leaseChartInst  = null;
 let leaseMemberCount = 0;
 let leaseFilter     = 'all';   // 'all' | 'tenant' | 'landlord'
 let leaseCommType   = 'pct';
+let leaseKickType   = 'dollar';
 
 const LEASE_DEMO_KEY = 'agentdesk_lease_txs';
 
@@ -6397,13 +6407,15 @@ function saveLeaseDemoTxs() {
 }
 
 function calcLeaseComm(l) {
-  const annualRent = (l.monthlyRent || 0) * 12;
-  const gross      = l.commType === 'pct' ? annualRent * (l.commValue || 0) / 100 : (l.commValue || 0);
-  const afterKick  = Math.max(0, gross - (l.kickback || 0));
-  const agent      = afterKick * ((l.brokSplit || 100) / 100);
-  const teamPct    = (l.teamMembers || []).reduce((s,m) => s + m.pct, 0);
-  const userNet    = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
-  return { gross, afterKick, agent, userNet, annualRent };
+  const monthlyRent = l.monthlyRent || 0;
+  const annualRent  = monthlyRent * 12;
+  const gross       = l.commType === 'pct' ? monthlyRent * (l.commValue || 0) / 100 : (l.commValue || 0);
+  const kickAmt     = l.kickType === 'pct' ? gross * (l.kickback || 0) / 100 : (l.kickback || 0);
+  const afterKick   = Math.max(0, gross - kickAmt);
+  const agent       = afterKick * ((l.brokSplit || 100) / 100);
+  const teamPct     = (l.teamMembers || []).reduce((s,m) => s + m.pct, 0);
+  const userNet     = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  return { gross, afterKick, agent, userNet, annualRent, monthlyRent, kickAmt };
 }
 
 function leaseDue(startDateStr) {
@@ -6421,7 +6433,7 @@ function getLeaseDemoSeed() {
       address: '88 Scott St, Unit 1210, Toronto, ON',
       clientName: 'Michael & Sara Wong', landlordName: 'Menkes Developments',
       monthlyRent: 2900, leaseTerm: '12', startDate: d(0, 1), endDate: d(11, 31),
-      commType: 'pct', commValue: 4, kickback: 0, brokSplit: 80,
+      commType: 'pct', commValue: 50, kickback: 0, kickType: 'dollar', brokSplit: 80,
       teamMembers: [{ name: 'Jeffrey Liu', pct: 100 }],
       isPaid: true, year: yr
     },
@@ -6430,7 +6442,7 @@ function getLeaseDemoSeed() {
       address: '42 Elmwood Ave, Mississauga, ON',
       clientName: 'David Tremblay', landlordName: '',
       monthlyRent: 3400, leaseTerm: '12', startDate: d(1, 15), endDate: d(2, 14).replace(yr, yr + 1),
-      commType: 'pct', commValue: 4, kickback: 500, brokSplit: 75,
+      commType: 'pct', commValue: 50, kickback: 288, kickType: 'dollar', brokSplit: 75,
       teamMembers: [{ name: 'Jeffrey Liu', pct: 70 }, { name: 'Anna Chen', pct: 30 }],
       isPaid: false, year: yr
     },
@@ -6439,7 +6451,7 @@ function getLeaseDemoSeed() {
       address: '200 King St W, Suite 400, Toronto, ON',
       clientName: 'Bloom Studio Inc.', landlordName: 'Oxford Properties',
       monthlyRent: 8500, leaseTerm: '36', startDate: d(2, 1), endDate: d(1, 28).replace(yr, yr + 3),
-      commType: 'pct', commValue: 3.5, kickback: 0, brokSplit: 80,
+      commType: 'pct', commValue: 50, kickback: 0, kickType: 'dollar', brokSplit: 80,
       teamMembers: [{ name: 'Jeffrey Liu', pct: 100 }],
       isPaid: false, year: yr
     }
@@ -6462,6 +6474,7 @@ function leaseRowToTx(row) {
     commType:     row.comm_type,
     commValue:    row.comm_value,
     kickback:     row.kickback,
+    kickType:     row.kick_type || 'dollar',
     brokSplit:    row.brok_split,
     teamMembers:  row.team_members || [],
     isPaid:       row.is_paid,
@@ -6485,6 +6498,7 @@ function leaseTxToRow(l, userId) {
     comm_type:     l.commType,
     comm_value:    l.commValue,
     kickback:      l.kickback,
+    kick_type:     l.kickType || 'dollar',
     brok_split:    l.brokSplit,
     team_members:  l.teamMembers,
     is_paid:       l.isPaid,
@@ -6621,7 +6635,7 @@ function renderLeaseList() {
 }
 
 function leaseCardHTML(l) {
-  const { gross, afterKick, agent, annualRent } = calcLeaseComm(l);
+  const { gross, afterKick, agent, annualRent, monthlyRent, kickAmt } = calcLeaseComm(l);
   const teamPctTotal = l.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
   const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const today   = new Date(); today.setHours(0, 0, 0, 0);
@@ -6643,8 +6657,9 @@ function leaseCardHTML(l) {
     : '';
 
   const commBasis = l.commType === 'pct'
-    ? `${l.commValue}% of annual rent (${fmt(annualRent)})`
+    ? `${l.commValue}% of 1st month rent (${fmt(monthlyRent)})`
     : `Flat fee`;
+  const kickDesc  = l.kickType === 'pct' ? `Kickback (${l.kickback}% of gross)` : 'Kickback Deduction';
 
   return `
   <div class="tx-card ${isOverdue ? 'overdue' : ''}" id="leasetxc-${l.id}">
@@ -6682,7 +6697,7 @@ function leaseCardHTML(l) {
       <div class="details-grid">
         <div class="d-item"><label>Representation</label><div class="d-val">${repLabel}</div></div>
         <div class="d-item"><label>Category</label><div class="d-val">${l.category}</div></div>
-        <div class="d-item"><label>Monthly Rent</label><div class="d-val">${fmt(l.monthlyRent)}</div></div>
+        <div class="d-item"><label>Monthly Rent (1st Mo. Basis)</label><div class="d-val">${fmt(l.monthlyRent)}</div></div>
         <div class="d-item"><label>Annual Rent</label><div class="d-val">${fmt(annualRent)}</div></div>
         <div class="d-item"><label>Lease Term</label><div class="d-val">${termLabel}</div></div>
         <div class="d-item"><label>Start Date</label><div class="d-val">${fmtDate(l.startDate)}</div></div>
@@ -6693,9 +6708,9 @@ function leaseCardHTML(l) {
       </div>
       <div class="breakdown-box">
         <div class="breakdown-title">Commission Breakdown</div>
-        <div class="bd-row"><span>Annual Rent Basis</span><span>${fmt(annualRent)}</span></div>
+        <div class="bd-row"><span>1st Month Rent Basis</span><span>${fmt(monthlyRent)}</span></div>
         <div class="bd-row"><span>Gross Commission (${commBasis})</span><span>${fmt(gross)}</span></div>
-        ${l.kickback > 0 ? `<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(l.kickback)}</span></div>` : ''}
+        ${kickAmt > 0 ? `<div class="bd-row"><span>${kickDesc}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
         ${teamPctTotal > 0
           ? `<div class="bd-row"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
@@ -6781,6 +6796,7 @@ function editLeaseTx(id) {
   $('lf-brok-split').value    = l.brokSplit;
   leaseSyncBrok();
   setLeaseCommType(l.commType || 'pct');
+  setLeaseKickType(l.kickType || 'dollar');
   $('lf-comm').value = l.commValue;
   // Team members
   $('lease-tm-list').innerHTML = '';
@@ -6814,8 +6830,19 @@ function resetLeaseForm() {
   $('lct-pct').classList.add('active');
   $('lct-flat').classList.remove('active');
   $('lf-comm-label').textContent = 'Commission Rate (%) *';
-  $('lf-comm').placeholder = '4';
+  $('lf-comm').placeholder = '50';
+  leaseKickType = 'dollar';
+  $('lkt-dollar').classList.add('active');
+  $('lkt-pct').classList.remove('active');
   $('lease-comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
+}
+
+function setLeaseKickType(t) {
+  leaseKickType = t;
+  $('lkt-dollar').classList.toggle('active', t === 'dollar');
+  $('lkt-pct').classList.toggle('active', t === 'pct');
+  $('lf-kickback').placeholder = t === 'pct' ? '0' : '0';
+  leasePreview();
 }
 
 function setLeaseCommType(t) {
@@ -6823,7 +6850,7 @@ function setLeaseCommType(t) {
   $('lct-pct').classList.toggle('active', t === 'pct');
   $('lct-flat').classList.toggle('active', t === 'flat');
   $('lf-comm-label').textContent = t === 'pct' ? 'Commission Rate (%) *' : 'Commission Amount ($) *';
-  $('lf-comm').placeholder = t === 'pct' ? '4' : '5000';
+  $('lf-comm').placeholder = t === 'pct' ? '50' : '5000';
   leasePreview();
 }
 
@@ -6859,9 +6886,9 @@ function leasePreview() {
     return;
   }
 
-  const annualRent = rent * 12;
-  const gross      = leaseCommType === 'pct' ? annualRent * comm / 100 : comm;
-  const afterKick  = Math.max(0, gross - kick);
+  const gross      = leaseCommType === 'pct' ? rent * comm / 100 : comm;
+  const kickAmt    = leaseKickType === 'pct' ? gross * kick / 100 : kick;
+  const afterKick  = Math.max(0, gross - kickAmt);
   const agent      = afterKick * (brok / 100);
 
   const members = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
@@ -6876,7 +6903,8 @@ function leasePreview() {
     ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
-  const basisDesc = leaseCommType === 'pct' ? `${comm}% of annual rent (${fmt(annualRent)})` : 'Flat fee';
+  const basisDesc = leaseCommType === 'pct' ? `${comm}% of 1st month rent (${fmt(rent)})` : 'Flat fee';
+  const kickDesc  = leaseKickType === 'pct' ? `Kickback (${kick}% of gross)` : 'Kickback';
 
   const netRow = teamPctTotal > 0
     ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
@@ -6886,9 +6914,9 @@ function leasePreview() {
 
   $('lease-comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
-    <div class="bd-row"><span>Annual Rent Basis</span><span>${fmt(annualRent)}</span></div>
+    <div class="bd-row"><span>1st Month Rent Basis</span><span>${fmt(rent)}</span></div>
     <div class="bd-row"><span>Gross Commission (${basisDesc})</span><span>${fmt(gross)}</span></div>
-    ${kick > 0 ? `<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>` : ''}
+    ${kickAmt > 0 ? `<div class="bd-row"><span>${kickDesc}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
     <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
     ${netRow}
@@ -6928,7 +6956,7 @@ async function saveLease() {
       ...leaseTxs[idx],
       repType, category, address, clientName, landlordName,
       monthlyRent, leaseTerm, startDate, endDate,
-      commType: leaseCommType, commValue, kickback, brokSplit,
+      commType: leaseCommType, commValue, kickback, kickType: leaseKickType, brokSplit,
       teamMembers, year: txYear
     };
     setLoading('btn-save-lease', true);
@@ -6953,7 +6981,7 @@ async function saveLease() {
   const newLease = {
     id: uid(), repType, category, address, clientName, landlordName,
     monthlyRent, leaseTerm, startDate, endDate,
-    commType: leaseCommType, commValue, kickback, brokSplit,
+    commType: leaseCommType, commValue, kickback, kickType: leaseKickType, brokSplit,
     teamMembers, isPaid: false, year: txYear
   };
 

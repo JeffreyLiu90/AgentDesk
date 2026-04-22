@@ -3745,10 +3745,12 @@ const fmtDate = str => {
 const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 function calcComm(t) {
-  const gross     = t.commType === 'pct' ? (t.purchasePrice * t.commValue / 100) : (t.commValue || 0);
-  const afterKick = Math.max(0, gross - (t.kickback || 0));
-  const agent     = afterKick * ((t.brokSplit || 100) / 100);
-  return { gross, afterKick, agent };
+  const gross        = t.commType === 'pct' ? (t.purchasePrice * t.commValue / 100) : (t.commValue || 0);
+  const afterKick    = Math.max(0, gross - (t.kickback || 0));
+  const agent        = afterKick * ((t.brokSplit || 100) / 100);
+  const teamPct      = (t.teamMembers || []).reduce((s,m) => s + m.pct, 0);
+  const userNet      = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  return { gross, afterKick, agent, userNet };
 }
 
 function paymentDue(closingDateStr) {
@@ -3851,14 +3853,14 @@ function renderTotalComm() {
 
   // ── RESALE ──
   transactions.filter(t => t.year === yr).forEach(t => {
-    const { agent } = calcComm(t);
+    const { userNet } = calcComm(t);
     const closing   = t.closingDate ? new Date(t.closingDate + 'T00:00:00') : null;
     const realized  = t.isPaid || (closing && closing <= today);
     if (tcMode === 'realized' && !realized) return;
     if (tcMode === 'expected' && realized)  return;
     items.push({
       type:'resale', label: t.clientName || 'Resale Deal',
-      address: t.address, amount: agent,
+      address: t.address, amount: userNet,
       date: t.closingDate,
       status: t.isPaid ? 'paid' : (closing && closing <= today ? 'pending' : 'future')
     });
@@ -3866,14 +3868,14 @@ function renderTotalComm() {
 
   // ── LEASE ──
   leaseTxs.filter(l => l.year === yr).forEach(l => {
-    const { agent } = calcLeaseComm(l);
+    const { userNet } = calcLeaseComm(l);
     const start     = l.startDate ? new Date(l.startDate + 'T00:00:00') : null;
     const realized  = start && start <= today;
     if (tcMode === 'realized' && !realized) return;
     if (tcMode === 'expected' && realized)  return;
     items.push({
       type:'lease', label: l.clientName || 'Lease Deal',
-      address: l.address, amount: agent,
+      address: l.address, amount: userNet,
       date: l.startDate,
       status: realized ? 'paid' : 'future'
     });
@@ -3881,16 +3883,16 @@ function renderTotalComm() {
 
   // ── PRECONSTRUCTION (per payout segment) ──
   preTxs.filter(p => p.year === yr).forEach(p => {
-    const { agent } = calcPreComm(p);
+    const { userNet } = calcPreComm(p);
     const payouts   = p.payouts || [];
-    const perPayout = payouts.length > 0 ? agent / payouts.length : agent;
+    const perPayout = payouts.length > 0 ? userNet / payouts.length : userNet;
     if (payouts.length === 0) {
       // no segments — treat whole amount
       const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
       if (tcMode === 'realized' && !realized) return;
       if (tcMode === 'expected' && realized)  return;
       items.push({ type:'precon', label: p.projectName || 'Precon Deal',
-        address: p.clientName, amount: agent, date: p.occupancyDate, status: realized ? 'paid' : 'future' });
+        address: p.clientName, amount: userNet, date: p.occupancyDate, status: realized ? 'paid' : 'future' });
     } else {
       payouts.forEach(po => {
         const poDate = po.date ? new Date(po.date + 'T00:00:00') : null;
@@ -5430,9 +5432,9 @@ function renderSummary() {
   const list = filtered();
   let earned=0, paid=0, outstanding=0, paidCnt=0, outCnt=0;
   list.forEach(t => {
-    const {agent} = calcComm(t);
-    earned += agent;
-    if (t.isPaid) { paid += agent; paidCnt++; } else { outstanding += agent; outCnt++; }
+    const {userNet} = calcComm(t);
+    earned += userNet;
+    if (t.isPaid) { paid += userNet; paidCnt++; } else { outstanding += userNet; outCnt++; }
   });
   $('s-deals').textContent = list.length;
   $('s-earned').textContent = fmt(earned);
@@ -5447,7 +5449,7 @@ function renderChart() {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const data   = new Array(12).fill(0);
   filtered().forEach(t => {
-    data[new Date(t.closingDate + 'T00:00:00').getMonth()] += calcComm(t).agent;
+    data[new Date(t.closingDate + 'T00:00:00').getMonth()] += calcComm(t).userNet;
   });
 
   const ctx = $('comm-chart').getContext('2d');
@@ -5822,7 +5824,9 @@ function calcPreComm(p) {
   const gross     = (p.commBasis || 0) * (p.commRate || 0) / 100;
   const afterKick = Math.max(0, gross - (p.kickback || 0));
   const agent     = afterKick * ((p.brokSplit || 100) / 100);
-  return { gross, afterKick, agent };
+  const teamPct   = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0);
+  const userNet   = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  return { gross, afterKick, agent, userNet };
 }
 
 function getPreDemoSeed() {
@@ -5946,10 +5950,10 @@ function renderPreSummary() {
   let totalAgent = 0, totalPaid = 0, totalOverdue = 0, paidCount = 0, overdueCount = 0;
 
   list.forEach(p => {
-    const { agent } = calcPreComm(p);
-    // Split agent across payouts equally if no specific split given
+    const { userNet } = calcPreComm(p);
+    // Split userNet across payouts equally
     const payoutCount = p.payouts.filter(x => x.date).length || 1;
-    const perPayout = agent / payoutCount;
+    const perPayout = userNet / payoutCount;
 
     p.payouts.forEach(pout => {
       if (!pout.date) return;
@@ -5960,7 +5964,7 @@ function renderPreSummary() {
         totalOverdue += perPayout; overdueCount++;
       }
     });
-    totalAgent += agent;
+    totalAgent += userNet;
   });
 
   $('ps-deals').textContent        = list.length;
@@ -5978,9 +5982,9 @@ function renderPreChart() {
   const today  = new Date(); today.setHours(0,0,0,0);
 
   filteredPre().forEach(p => {
-    const { agent } = calcPreComm(p);
+    const { userNet } = calcPreComm(p);
     const validPayouts = p.payouts.filter(x => x.date && x.isPaid);
-    const perPayout = validPayouts.length > 0 ? agent / validPayouts.length : 0;
+    const perPayout = validPayouts.length > 0 ? userNet / validPayouts.length : 0;
     validPayouts.forEach(pout => {
       const m = new Date(pout.date + 'T00:00:00').getMonth();
       data[m] += perPayout;
@@ -6397,7 +6401,9 @@ function calcLeaseComm(l) {
   const gross      = l.commType === 'pct' ? annualRent * (l.commValue || 0) / 100 : (l.commValue || 0);
   const afterKick  = Math.max(0, gross - (l.kickback || 0));
   const agent      = afterKick * ((l.brokSplit || 100) / 100);
-  return { gross, afterKick, agent, annualRent };
+  const teamPct    = (l.teamMembers || []).reduce((s,m) => s + m.pct, 0);
+  const userNet    = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  return { gross, afterKick, agent, userNet, annualRent };
 }
 
 function leaseDue(startDateStr) {
@@ -6541,14 +6547,12 @@ function renderLeaseSummary() {
   let totalAgent = 0, totalPaid = 0, totalOutstanding = 0, paidCount = 0, unpaidCount = 0;
 
   list.forEach(l => {
-    const { agent } = calcLeaseComm(l);
-    totalAgent += agent;
+    const { userNet } = calcLeaseComm(l);
+    totalAgent += userNet;
     if (l.isPaid) {
-      totalPaid += agent; paidCount++;
+      totalPaid += userNet; paidCount++;
     } else {
-      const due = leaseDue(l.startDate);
-      if (due < today) { totalOutstanding += agent; unpaidCount++; }
-      else             { totalOutstanding += agent; unpaidCount++; }
+      totalOutstanding += userNet; unpaidCount++;
     }
   });
 
@@ -6567,10 +6571,10 @@ function renderLeaseChart() {
 
   filteredLease().forEach(l => {
     if (!l.startDate) return;
-    const { agent } = calcLeaseComm(l);
+    const { userNet } = calcLeaseComm(l);
     if (l.isPaid) {
       const m = new Date(l.startDate + 'T00:00:00').getMonth();
-      data[m] += agent;
+      data[m] += userNet;
     }
   });
 

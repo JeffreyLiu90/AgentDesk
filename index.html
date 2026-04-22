@@ -731,6 +731,8 @@
     .expand-btn.open { transform: rotate(180deg); }
     .del-btn { background: none; border: none; font-size: var(--text-md); cursor: pointer; color: var(--muted); padding: 0.3rem; border-radius: var(--r-md); transition: all var(--t-base); }
     .del-btn:hover { background: var(--danger-bg); color: var(--danger); }
+    .edit-btn { background: none; border: none; font-size: var(--text-md); cursor: pointer; color: var(--muted); padding: 0.3rem; border-radius: var(--r-md); transition: all var(--t-base); }
+    .edit-btn:hover { background: var(--info-bg); color: var(--primary); }
 
     .tx-details { display: none; border-top: 1px solid var(--border); padding: 1.2rem 1.4rem 1.4rem; }
     .tx-details.open { display: block; }
@@ -3431,7 +3433,7 @@
 <div class="overlay hidden" id="add-tx-overlay">
   <div class="modal-lg">
     <div class="modal-head">
-      <h2>Add New Transaction</h2>
+      <h2 id="add-tx-title">Add New Transaction</h2>
       <button class="modal-x" onclick="closeAddTx()">✕</button>
     </div>
     <div class="modal-body">
@@ -3503,7 +3505,7 @@
 <div class="overlay hidden" id="add-lease-overlay">
   <div class="modal-lg">
     <div class="modal-head">
-      <h2>Add Lease Transaction</h2>
+      <h2 id="add-lease-title">Add Lease Transaction</h2>
       <button class="modal-x" onclick="closeAddLease()">✕</button>
     </div>
     <div class="modal-body">
@@ -3614,7 +3616,7 @@
 <div class="overlay hidden" id="add-pre-overlay">
   <div class="modal-lg">
     <div class="modal-head">
-      <h2>Add Preconstruction Transaction</h2>
+      <h2 id="add-pre-title">Add Preconstruction Transaction</h2>
       <button class="modal-x" onclick="closeAddPre()">✕</button>
     </div>
     <div class="modal-body">
@@ -3728,6 +3730,9 @@ let selectedYear   = new Date().getFullYear();
 let chartInst      = null;
 let commType       = 'pct';
 let memberCount    = 0;
+let editingTxId    = null;
+let editingPreId   = null;
+let editingLeaseId = null;
 
 /* ─── UTILS ─── */
 const $     = id => document.getElementById(id);
@@ -5483,6 +5488,8 @@ function renderTxList() {
 
 function txCardHTML(t) {
   const {gross, afterKick, agent} = calcComm(t);
+  const teamPctTotal = t.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const due      = paymentDue(t.closingDate);
   const today    = new Date(); today.setHours(0,0,0,0);
   const isOverdue = !t.isPaid && due < today;
@@ -5493,8 +5500,16 @@ function txCardHTML(t) {
   const pspText   = t.isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending';
 
   const teamHTML = t.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${t.teamMembers.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${t.teamMembers.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
+
+  const breakdownTotal = teamPctTotal > 0
+    ? `<div class="bd-row"><span>Brokerage (you keep ${t.brokSplit}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
+       <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
+    : `<div class="bd-row sep"><span>Brokerage (you keep ${t.brokSplit}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
+       <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
 
   return `
   <div class="tx-card ${isOverdue?'overdue':''}" id="txc-${t.id}">
@@ -5509,12 +5524,13 @@ function txCardHTML(t) {
       </div>
       <div class="tx-right">
         ${isOverdue ? '<span class="overdue-pill">Payment Overdue</span>' : ''}
-        <div class="tx-amount"><div class="tx-amount-val">${fmt(agent)}</div><div class="tx-amount-lbl">your net commission</div></div>
+        <div class="tx-amount"><div class="tx-amount-val">${fmt(userNet)}</div><div class="tx-amount-lbl">your net commission</div></div>
         <div class="paid-box">
           <input class="paid-cb" type="checkbox" ${t.isPaid?'checked':''} onclick="event.stopPropagation(); togglePaid('${t.id}')" />
           <div class="paid-lbl ${lblClass}">${lblText}</div>
         </div>
         <div class="expand-btn" id="arr-${t.id}">▼</div>
+        <button class="edit-btn" onclick="event.stopPropagation(); editTx('${t.id}')" title="Edit">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation(); deleteTx('${t.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -5532,8 +5548,7 @@ function txCardHTML(t) {
         <div class="bd-row"><span>Gross Commission ${t.commType==='pct'?`(${t.commValue}% of ${fmt(t.purchasePrice)})`:'(flat rate)'}</span><span>${fmt(gross)}</span></div>
         ${t.kickback>0?`<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(t.kickback)}</span></div>`:''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-        <div class="bd-row sep"><span>Brokerage (you keep ${t.brokSplit}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
-        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>
+        ${breakdownTotal}
       </div>
       ${teamHTML}
       <div class="payment-bar">
@@ -5582,10 +5597,47 @@ async function deleteTx(id) {
    ADD TRANSACTION MODAL
 ════════════════════════════════════════════ */
 function openAddTx() {
+  editingTxId = null;
+  $('add-tx-title').textContent = 'Add New Transaction';
+  $('btn-save-tx').textContent  = 'Add Transaction';
   $('add-tx-overlay').classList.remove('hidden');
   resetForm();
 }
-function closeAddTx() { $('add-tx-overlay').classList.add('hidden'); }
+function closeAddTx() { $('add-tx-overlay').classList.add('hidden'); editingTxId = null; }
+
+function editTx(id) {
+  const t = transactions.find(x => x.id === id);
+  if (!t) return;
+  editingTxId = id;
+  $('add-tx-title').textContent = 'Edit Transaction';
+  $('btn-save-tx').textContent  = 'Save Changes';
+  $('add-tx-overlay').classList.remove('hidden');
+  resetForm();
+  $('f-addr').value        = t.address;
+  $('f-client').value      = t.clientName;
+  $('f-type').value        = t.type;
+  $('f-price').value       = t.purchasePrice;
+  $('f-closing').value     = t.closingDate;
+  $('f-category').value    = t.category || 'Condo';
+  $('f-kickback').value    = t.kickback || '';
+  $('f-brok-split').value  = t.brokSplit;
+  syncBrokSplit();
+  setCommType(t.commType);
+  $('f-comm').value = t.commValue;
+  $('tm-list').innerHTML = '';
+  memberCount = 0;
+  if (t.teamMembers?.length) {
+    t.teamMembers.forEach(m => {
+      addMember();
+      const row = $(`tm-${memberCount}`);
+      row.querySelector('[id$="-name"]').value = m.name;
+      row.querySelector('[id$="-pct"]').value  = m.pct;
+    });
+  } else {
+    addMember(true);
+  }
+  previewUpdate();
+}
 
 function resetForm() {
   ['f-addr','f-client','f-price','f-comm','f-kickback','f-brok-split','f-brok-keep'].forEach(id => {
@@ -5648,19 +5700,28 @@ function previewUpdate() {
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
     name: row.querySelector('[id$="-name"]')?.value || 'Member',
     pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value)||0
-  })).filter(m => m.name);
+  })).filter(m => m.name && m.pct > 0);
+
+  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
+
+  const netRow = teamPctTotal > 0
+    ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
+    : `<div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
 
   $('comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
     <div class="bd-row"><span>Gross Commission ${commType==='pct'?`(${commV}%)`:'(flat)'}</span><span>${fmt(gross)}</span></div>
     ${kick>0?`<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>`:''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-    <div class="bd-row sep"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
-    <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>
+    <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
+    ${netRow}
     ${teamHTML}`;
 }
 
@@ -5673,6 +5734,7 @@ async function saveTx() {
   const commV   = parseFloat($('f-comm').value);
   const kick    = parseFloat($('f-kickback').value)||0;
   const brok    = parseFloat($('f-brok-split').value);
+  const category = $('f-category').value;
 
   if (!addr || !client || !closing || isNaN(price) || isNaN(commV) || isNaN(brok)) {
     toast('Please fill in all required fields.', 'error'); return;
@@ -5685,8 +5747,36 @@ async function saveTx() {
 
   const closingYear = new Date(closing + 'T00:00:00').getFullYear();
 
-  const category = $('f-category').value;
+  /* ── EDIT MODE ── */
+  if (editingTxId) {
+    const idx = transactions.findIndex(x => x.id === editingTxId);
+    if (idx === -1) return;
+    const updated = {
+      ...transactions[idx],
+      address: addr, clientName: client, type, category,
+      purchasePrice: price, closingDate: closing,
+      commType, commValue: commV, kickback: kick,
+      brokSplit: brok, teamMembers: members, year: closingYear
+    };
+    setLoading('btn-save-tx', true);
+    if (isConfigured) {
+      const { error } = await sb.from('transactions').update(txToRow(updated, currentUser.id)).eq('id', editingTxId);
+      setLoading('btn-save-tx', false);
+      if (error) { toast('Error updating transaction: ' + error.message, 'error'); return; }
+    } else {
+      setLoading('btn-save-tx', false);
+    }
+    transactions[idx] = updated;
+    saveDemoTxs();
+    editingTxId = null;
+    closeAddTx();
+    selectedYear = closingYear;
+    initResale();
+    toast('✓ Transaction updated!', 'success');
+    return;
+  }
 
+  /* ── ADD MODE ── */
   const newTx = {
     id: uid(), address: addr, clientName: client, type, category,
     purchasePrice: price, closingDate: closing,
@@ -5935,18 +6025,20 @@ function renderPreList() {
 
 function preCardHTML(p) {
   const { gross, afterKick, agent } = calcPreComm(p);
+  const teamPctTotal = p.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const validPayouts = p.payouts.filter(x => x.date);
   const payoutCount  = validPayouts.length || 1;
-  const perPayout    = agent / payoutCount;
+  const perPayout    = userNet / payoutCount;
 
   const hasOverdue = validPayouts.some(x => !x.isPaid && new Date(x.date + 'T00:00:00') < today);
   const allPaid    = validPayouts.length > 0 && validPayouts.every(x => x.isPaid);
   const barColor   = allPaid ? 'var(--success)' : hasOverdue ? 'var(--danger)' : 'var(--warning)';
 
   const teamHTML = p.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${p.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${p.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const payoutsHTML = validPayouts.map((pout, i) => {
@@ -5984,8 +6076,8 @@ function preCardHTML(p) {
       <div class="tx-right">
         ${hasOverdue ? '<span class="overdue-pill">Payout Overdue</span>' : ''}
         <div class="tx-amount">
-          <div class="tx-amount-val">${fmt(agent)}</div>
-          <div class="tx-amount-lbl">total net commission</div>
+          <div class="tx-amount-val">${fmt(userNet)}</div>
+          <div class="tx-amount-lbl">your net commission</div>
         </div>
         <div class="paid-box">
           <div class="paid-lbl" style="font-size:.72rem;font-weight:700;color:${allPaid?'var(--success)':hasOverdue?'var(--danger)':'var(--warning)'}">
@@ -5993,6 +6085,7 @@ function preCardHTML(p) {
           </div>
         </div>
         <div class="expand-btn" id="pre-arr-${p.id}">▼</div>
+        <button class="edit-btn" onclick="event.stopPropagation(); editPreTx('${p.id}')" title="Edit">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation(); deletePreTx('${p.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -6010,8 +6103,14 @@ function preCardHTML(p) {
         <div class="bd-row"><span>Gross Commission (${p.commRate}% of ${fmt(p.commBasis)})</span><span>${fmt(gross)}</span></div>
         ${p.kickback > 0 ? `<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(p.kickback)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-        <div class="bd-row sep"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
-        <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>
+        ${teamPctTotal > 0
+          ? `<div class="bd-row"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+             <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+             <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+             <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(userNet)}</span></div>`
+          : `<div class="bd-row sep"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+             <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>`
+        }
       </div>
       ${teamHTML}
       <div style="margin-top:1rem;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.5rem">Payment Schedule</div>
@@ -6062,10 +6161,54 @@ async function deletePreTx(id) {
    PRECONSTRUCTION — ADD MODAL
 ════════════════════════════════════════════ */
 function openAddPre() {
+  editingPreId = null;
+  $('add-pre-title').textContent = 'Add Preconstruction Transaction';
+  $('btn-save-pre').textContent  = 'Add Transaction';
   $('add-pre-overlay').classList.remove('hidden');
   resetPreForm();
 }
-function closeAddPre() { $('add-pre-overlay').classList.add('hidden'); }
+function closeAddPre() { $('add-pre-overlay').classList.add('hidden'); editingPreId = null; }
+
+function editPreTx(id) {
+  const p = preTxs.find(x => x.id === id);
+  if (!p) return;
+  editingPreId = id;
+  $('add-pre-title').textContent = 'Edit Preconstruction Transaction';
+  $('btn-save-pre').textContent  = 'Save Changes';
+  $('add-pre-overlay').classList.remove('hidden');
+  resetPreForm();
+  $('pf-project').value       = p.projectName;
+  $('pf-client').value        = p.clientName;
+  $('pf-price').value         = p.purchasePrice;
+  $('pf-purchase-date').value = p.purchaseDate;
+  $('pf-category').value      = p.category || 'Condo';
+  $('pf-occupancy').value     = p.occupancyDate || '';
+  $('pf-basis').value         = p.commBasis;
+  $('pf-rate').value          = p.commRate;
+  $('pf-kickback').value      = p.kickback || '';
+  $('pf-brok').value          = p.brokSplit;
+  // Payout schedule
+  p.payouts.forEach((pout, i) => {
+    if (i < 4) {
+      $(`pd-label-${i+1}`).value = pout.label || '';
+      $(`pd-date-${i+1}`).value  = pout.date  || '';
+    }
+  });
+  // Team members
+  $('pre-tm-list').innerHTML = '';
+  preMemberCount = 0;
+  if (p.teamMembers?.length) {
+    p.teamMembers.forEach(m => {
+      addPreMember();
+      const row = $(`ptm-${preMemberCount}`);
+      row.querySelector('[id$="-name"]').value = m.name;
+      row.querySelector('[id$="-pct"]').value  = m.pct;
+    });
+  } else {
+    addPreMember(true);
+  }
+  prePreview();
+}
 
 function resetPreForm() {
   ['pf-project','pf-client','pf-price','pf-basis','pf-rate','pf-kickback','pf-brok'].forEach(id => {
@@ -6118,33 +6261,42 @@ function prePreview() {
   const members = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name: row.querySelector('[id$="-name"]')?.value || 'Member',
     pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
-  })).filter(m => m.name);
+  })).filter(m => m.name && m.pct > 0);
+
+  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
+
+  const netRow = teamPctTotal > 0
+    ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(userNet)}</span></div>`
+    : `<div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>`;
 
   $('pre-comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
     <div class="bd-row"><span>Gross Commission (${rate}% of ${fmt(basis)})</span><span>${fmt(gross)}</span></div>
     ${kick > 0 ? `<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>` : ''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-    <div class="bd-row sep"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
-    <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>
+    <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+    ${netRow}
     ${teamHTML}`;
 }
 
 async function savePre() {
-  const projectName  = $('pf-project').value.trim();
-  const clientName   = $('pf-client').value.trim();
+  const projectName   = $('pf-project').value.trim();
+  const clientName    = $('pf-client').value.trim();
   const purchasePrice = parseFloat($('pf-price').value);
-  const purchaseDate = $('pf-purchase-date').value;
-  const category     = $('pf-category').value;
+  const purchaseDate  = $('pf-purchase-date').value;
+  const category      = $('pf-category').value;
   const occupancyDate = $('pf-occupancy').value;
-  const commBasis    = parseFloat($('pf-basis').value);
-  const commRate     = parseFloat($('pf-rate').value);
-  const kickback     = parseFloat($('pf-kickback').value) || 0;
-  const brokSplit    = parseFloat($('pf-brok').value);
+  const commBasis     = parseFloat($('pf-basis').value);
+  const commRate      = parseFloat($('pf-rate').value);
+  const kickback      = parseFloat($('pf-kickback').value) || 0;
+  const brokSplit     = parseFloat($('pf-brok').value);
 
   if (!projectName || !clientName || !purchaseDate || isNaN(purchasePrice) || isNaN(commBasis) || isNaN(commRate) || isNaN(brokSplit)) {
     toast('Please fill in all required fields.', 'error'); return;
@@ -6164,6 +6316,41 @@ async function savePre() {
 
   const txYear = new Date(purchaseDate + 'T00:00:00').getFullYear();
 
+  /* ── EDIT MODE ── */
+  if (editingPreId) {
+    const idx = preTxs.findIndex(x => x.id === editingPreId);
+    if (idx === -1) return;
+    // Preserve existing payout isPaid state where dates match
+    const existingPayouts = preTxs[idx].payouts || [];
+    const mergedPayouts = payouts.map(po => {
+      const existing = existingPayouts.find(e => e.date === po.date && e.label === po.label);
+      return existing ? { ...po, isPaid: existing.isPaid } : po;
+    });
+    const updated = {
+      ...preTxs[idx],
+      projectName, clientName, purchasePrice, purchaseDate,
+      category, occupancyDate, commBasis, commRate, kickback, brokSplit,
+      teamMembers, payouts: mergedPayouts, year: txYear
+    };
+    setLoading('btn-save-pre', true);
+    if (isConfigured) {
+      const { error } = await sb.from('pre_transactions').update(preTxToRow(updated, currentUser.id)).eq('id', editingPreId);
+      setLoading('btn-save-pre', false);
+      if (error) { toast('Error updating: ' + error.message, 'error'); return; }
+    } else {
+      setLoading('btn-save-pre', false);
+    }
+    preTxs[idx] = updated;
+    savePreDemoTxs();
+    editingPreId = null;
+    closeAddPre();
+    preYear = txYear;
+    renderPreYearTabs(); renderPreSummary(); renderPreChart(); renderPreList();
+    toast('✓ Project updated!', 'success');
+    return;
+  }
+
+  /* ── ADD MODE ── */
   const newPre = {
     id: uid(), projectName, clientName, purchasePrice, purchaseDate,
     category, occupancyDate, commBasis, commRate, kickback, brokSplit,
@@ -6431,6 +6618,8 @@ function renderLeaseList() {
 
 function leaseCardHTML(l) {
   const { gross, afterKick, agent, annualRent } = calcLeaseComm(l);
+  const teamPctTotal = l.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const today   = new Date(); today.setHours(0, 0, 0, 0);
   const due     = leaseDue(l.startDate);
   const isOverdue = !l.isPaid && due < today;
@@ -6446,7 +6635,7 @@ function leaseCardHTML(l) {
   const termLabel = l.leaseTerm === 'month-to-month' ? 'Month-to-month' : `${l.leaseTerm} months`;
 
   const teamHTML = l.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${l.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${l.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const commBasis = l.commType === 'pct'
@@ -6470,8 +6659,8 @@ function leaseCardHTML(l) {
       <div class="tx-right">
         ${isOverdue ? '<span class="overdue-pill">Payment Overdue</span>' : ''}
         <div class="tx-amount">
-          <div class="tx-amount-val">${fmt(agent)}</div>
-          <div class="tx-amount-lbl">net commission</div>
+          <div class="tx-amount-val">${fmt(userNet)}</div>
+          <div class="tx-amount-lbl">your net commission</div>
         </div>
         <div class="paid-box" onclick="event.stopPropagation(); toggleLeasePaid('${l.id}')">
           <div class="paid-lbl" style="color:${statusColor}">${statusLabel}</div>
@@ -6481,6 +6670,7 @@ function leaseCardHTML(l) {
           </label>
         </div>
         <div class="expand-btn" id="lease-arr-${l.id}">▼</div>
+        <button class="edit-btn" onclick="event.stopPropagation(); editLeaseTx('${l.id}')" title="Edit">✏️</button>
         <button class="del-btn" onclick="event.stopPropagation(); deleteLeaseTx('${l.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -6503,8 +6693,14 @@ function leaseCardHTML(l) {
         <div class="bd-row"><span>Gross Commission (${commBasis})</span><span>${fmt(gross)}</span></div>
         ${l.kickback > 0 ? `<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(l.kickback)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-        <div class="bd-row sep"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
-        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>
+        ${teamPctTotal > 0
+          ? `<div class="bd-row"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+             <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+             <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+             <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
+          : `<div class="bd-row sep"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+             <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`
+        }
       </div>
       ${teamHTML}
     </div>
@@ -6552,10 +6748,51 @@ async function deleteLeaseTx(id) {
    LEASE — ADD MODAL
 ════════════════════════════════════════════ */
 function openAddLease() {
+  editingLeaseId = null;
+  $('add-lease-title').textContent = 'Add Lease Transaction';
+  $('btn-save-lease').textContent  = 'Add Transaction';
   $('add-lease-overlay').classList.remove('hidden');
   resetLeaseForm();
 }
-function closeAddLease() { $('add-lease-overlay').classList.add('hidden'); }
+function closeAddLease() { $('add-lease-overlay').classList.add('hidden'); editingLeaseId = null; }
+
+function editLeaseTx(id) {
+  const l = leaseTxs.find(x => x.id === id);
+  if (!l) return;
+  editingLeaseId = id;
+  $('add-lease-title').textContent = 'Edit Lease Transaction';
+  $('btn-save-lease').textContent  = 'Save Changes';
+  $('add-lease-overlay').classList.remove('hidden');
+  resetLeaseForm();
+  $('lf-rep-type').value      = l.repType || 'tenant';
+  $('lf-category').value      = l.category || 'Condo';
+  $('lf-addr').value          = l.address;
+  $('lf-client').value        = l.clientName;
+  $('lf-landlord-name').value = l.landlordName || '';
+  $('lf-rent').value          = l.monthlyRent;
+  $('lf-term').value          = l.leaseTerm || '12';
+  $('lf-start').value         = l.startDate;
+  $('lf-end').value           = l.endDate || '';
+  $('lf-kickback').value      = l.kickback || '';
+  $('lf-brok-split').value    = l.brokSplit;
+  leaseSyncBrok();
+  setLeaseCommType(l.commType || 'pct');
+  $('lf-comm').value = l.commValue;
+  // Team members
+  $('lease-tm-list').innerHTML = '';
+  leaseMemberCount = 0;
+  if (l.teamMembers?.length) {
+    l.teamMembers.forEach(m => {
+      addLeaseMember();
+      const row = $(`ltm-${leaseMemberCount}`);
+      row.querySelector('[id$="-name"]').value = m.name;
+      row.querySelector('[id$="-pct"]').value  = m.pct;
+    });
+  } else {
+    addLeaseMember(true);
+  }
+  leasePreview();
+}
 
 function resetLeaseForm() {
   ['lf-addr','lf-client','lf-landlord-name','lf-rent','lf-comm','lf-kickback','lf-brok-split','lf-brok-keep'].forEach(id => {
@@ -6626,13 +6863,22 @@ function leasePreview() {
   const members = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name: row.querySelector('[id$="-name"]')?.value || 'Member',
     pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
-  })).filter(m => m.name);
+  })).filter(m => m.name && m.pct > 0);
+
+  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
+  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}</div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const basisDesc = leaseCommType === 'pct' ? `${comm}% of annual rent (${fmt(annualRent)})` : 'Flat fee';
+
+  const netRow = teamPctTotal > 0
+    ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
+       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
+    : `<div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
 
   $('lease-comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
@@ -6640,24 +6886,24 @@ function leasePreview() {
     <div class="bd-row"><span>Gross Commission (${basisDesc})</span><span>${fmt(gross)}</span></div>
     ${kick > 0 ? `<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>` : ''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-    <div class="bd-row sep"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
-    <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>
+    <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
+    ${netRow}
     ${teamHTML}`;
 }
 
 async function saveLease() {
-  const repType     = $('lf-rep-type').value;
-  const category    = $('lf-category').value;
-  const address     = $('lf-addr').value.trim();
-  const clientName  = $('lf-client').value.trim();
-  const landlordName= $('lf-landlord-name').value.trim();
-  const monthlyRent = parseFloat($('lf-rent').value);
-  const leaseTerm   = $('lf-term').value;
-  const startDate   = $('lf-start').value;
-  const endDate     = $('lf-end').value;
-  const commValue   = parseFloat($('lf-comm').value);
-  const kickback    = parseFloat($('lf-kickback').value) || 0;
-  const brokSplit   = parseFloat($('lf-brok-split').value);
+  const repType      = $('lf-rep-type').value;
+  const category     = $('lf-category').value;
+  const address      = $('lf-addr').value.trim();
+  const clientName   = $('lf-client').value.trim();
+  const landlordName = $('lf-landlord-name').value.trim();
+  const monthlyRent  = parseFloat($('lf-rent').value);
+  const leaseTerm    = $('lf-term').value;
+  const startDate    = $('lf-start').value;
+  const endDate      = $('lf-end').value;
+  const commValue    = parseFloat($('lf-comm').value);
+  const kickback     = parseFloat($('lf-kickback').value) || 0;
+  const brokSplit    = parseFloat($('lf-brok-split').value);
 
   if (!address || !clientName || !startDate || isNaN(monthlyRent) || isNaN(commValue) || isNaN(brokSplit)) {
     toast('Please fill in all required fields.', 'error'); return;
@@ -6670,6 +6916,36 @@ async function saveLease() {
 
   const txYear = new Date(startDate + 'T00:00:00').getFullYear();
 
+  /* ── EDIT MODE ── */
+  if (editingLeaseId) {
+    const idx = leaseTxs.findIndex(x => x.id === editingLeaseId);
+    if (idx === -1) return;
+    const updated = {
+      ...leaseTxs[idx],
+      repType, category, address, clientName, landlordName,
+      monthlyRent, leaseTerm, startDate, endDate,
+      commType: leaseCommType, commValue, kickback, brokSplit,
+      teamMembers, year: txYear
+    };
+    setLoading('btn-save-lease', true);
+    if (isConfigured) {
+      const { error } = await sb.from('lease_transactions').update(leaseTxToRow(updated, currentUser.id)).eq('id', editingLeaseId);
+      setLoading('btn-save-lease', false);
+      if (error) { toast('Error updating: ' + error.message, 'error'); return; }
+    } else {
+      setLoading('btn-save-lease', false);
+    }
+    leaseTxs[idx] = updated;
+    saveLeaseDemoTxs();
+    editingLeaseId = null;
+    closeAddLease();
+    leaseYear = txYear;
+    renderLeaseYearTabs(); renderLeaseSummary(); renderLeaseChart(); renderLeaseList();
+    toast('✓ Lease transaction updated!', 'success');
+    return;
+  }
+
+  /* ── ADD MODE ── */
   const newLease = {
     id: uid(), repType, category, address, clientName, landlordName,
     monthlyRent, leaseTerm, startDate, endDate,

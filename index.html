@@ -1862,7 +1862,7 @@
     </div>
     <div class="features-grid">
       <div class="feat-card"><div class="feat-icon">💰</div><h3>Commission Tracking</h3><p>Log every deal with full commission breakdowns — kickbacks, brokerage splits, and team allocations.</p></div>
-      <div class="feat-card"><div class="feat-icon">⏰</div><h3>Payment Alerts</h3><p>Payments due 14 days after closing are tracked automatically. Overdue deals turn red so nothing slips through.</p></div>
+      <div class="feat-card"><div class="feat-icon">⏰</div><h3>Payment Alerts</h3><p>Payments due 7 days after closing are tracked automatically. Overdue deals turn red so nothing slips through.</p></div>
       <div class="feat-card"><div class="feat-icon">👥</div><h3>Team Splits</h3><p>Add team members with their percentage split. Instantly see each person's take-home from every deal.</p></div>
       <div class="feat-card"><div class="feat-icon">📊</div><h3>Monthly Earnings Chart</h3><p>A visual month-by-month summary of your commission income for any year.</p></div>
     </div>
@@ -3478,7 +3478,16 @@
       </div>
       <div class="form-row">
         <div class="fg"><label id="comm-input-label">Commission Rate (%) *</label><input type="number" id="f-comm" placeholder="2.5" step="0.01" min="0" oninput="previewUpdate()" /></div>
-        <div class="fg"><label>Kickback Amount ($)</label><input type="number" id="f-kickback" placeholder="0" min="0" oninput="previewUpdate()" /></div>
+        <div class="fg">
+          <label>Kickback</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <div class="comm-type-row" style="margin:0;flex-shrink:0">
+              <button class="ctype-btn active" id="rkt-dollar" onclick="setResaleKickType('dollar')" style="padding:.3rem .6rem;font-size:.75rem">$</button>
+              <button class="ctype-btn"        id="rkt-pct"    onclick="setResaleKickType('pct')"    style="padding:.3rem .6rem;font-size:.75rem">%</button>
+            </div>
+            <input type="number" id="f-kickback" placeholder="0" min="0" style="flex:1" oninput="previewUpdate()" />
+          </div>
+        </div>
       </div>
 
       <div class="sec-divider">🏢 Brokerage Split</div>
@@ -3736,6 +3745,7 @@ let transactions   = [];
 let selectedYear   = new Date().getFullYear();
 let chartInst      = null;
 let commType       = 'pct';
+let resaleKickType = 'dollar';
 let memberCount    = 0;
 let editingTxId    = null;
 let editingPreId   = null;
@@ -3753,16 +3763,17 @@ const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2)
 
 function calcComm(t) {
   const gross        = t.commType === 'pct' ? (t.purchasePrice * t.commValue / 100) : (t.commValue || 0);
-  const afterKick    = Math.max(0, gross - (t.kickback || 0));
+  const kickAmt      = t.kickType === 'pct' ? gross * (t.kickback || 0) / 100 : (t.kickback || 0);
+  const afterKick    = Math.max(0, gross - kickAmt);
   const agent        = afterKick * ((t.brokSplit || 100) / 100);
   const teamPct      = (t.teamMembers || []).reduce((s,m) => s + m.pct, 0);
   const userNet      = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
-  return { gross, afterKick, agent, userNet };
+  return { gross, afterKick, agent, userNet, kickAmt };
 }
 
 function paymentDue(closingDateStr) {
   const d = new Date(closingDateStr + 'T00:00:00');
-  d.setDate(d.getDate() + 14);
+  d.setDate(d.getDate() + 7);
   return d;
 }
 
@@ -3793,6 +3804,7 @@ function rowToTx(row) {
     commType:      row.comm_type,
     commValue:     row.comm_value,
     kickback:      row.kickback,
+    kickType:      row.kick_type || 'dollar',
     brokSplit:     row.brok_split,
     teamMembers:   row.team_members || [],
     isPaid:        row.is_paid,
@@ -5498,7 +5510,7 @@ function renderTxList() {
 }
 
 function txCardHTML(t) {
-  const {gross, afterKick, agent} = calcComm(t);
+  const {gross, afterKick, agent, kickAmt} = calcComm(t);
   const teamPctTotal = t.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
   const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const due      = paymentDue(t.closingDate);
@@ -5557,13 +5569,13 @@ function txCardHTML(t) {
       <div class="breakdown-box">
         <div class="breakdown-title">Commission Breakdown</div>
         <div class="bd-row"><span>Gross Commission ${t.commType==='pct'?`(${t.commValue}% of ${fmt(t.purchasePrice)})`:'(flat rate)'}</span><span>${fmt(gross)}</span></div>
-        ${t.kickback>0?`<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(t.kickback)}</span></div>`:''}
+        ${kickAmt>0?`<div class="bd-row"><span>Kickback${t.kickType==='pct'?` (${t.kickback}% of gross)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>`:''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
         ${breakdownTotal}
       </div>
       ${teamHTML}
       <div class="payment-bar">
-        💳 <span>Payment expected <strong>${fmtDate(due.toISOString().split('T')[0])}</strong> (14 days after closing)</span>
+        💳 <span>Payment expected <strong>${fmtDate(due.toISOString().split('T')[0])}</strong> (7 days after closing)</span>
         <span class="payment-status-pill ${pspClass}">${pspText}</span>
       </div>
     </div>
@@ -5634,6 +5646,7 @@ function editTx(id) {
   $('f-brok-split').value  = t.brokSplit;
   syncBrokSplit();
   setCommType(t.commType);
+  setResaleKickType(t.kickType || 'dollar');
   $('f-comm').value = t.commValue;
   $('tm-list').innerHTML = '';
   memberCount = 0;
@@ -5659,6 +5672,7 @@ function resetForm() {
   $('tm-list').innerHTML = '';
   memberCount = 0;
   setCommType('pct');
+  setResaleKickType('dollar');
   $('comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
   addMember(true);
 }
@@ -5669,6 +5683,13 @@ function setCommType(type) {
   $('ct-flat').classList.toggle('active', type==='flat');
   $('comm-input-label').textContent  = type==='pct' ? 'Commission Rate (%) *' : 'Commission Amount ($) *';
   $('f-comm').placeholder = type==='pct' ? '2.5' : '20000';
+  previewUpdate();
+}
+
+function setResaleKickType(t) {
+  resaleKickType = t;
+  $('rkt-dollar').classList.toggle('active', t === 'dollar');
+  $('rkt-pct').classList.toggle('active', t === 'pct');
   previewUpdate();
 }
 
@@ -5705,7 +5726,8 @@ function previewUpdate() {
   }
 
   const gross     = commType==='pct' ? price*commV/100 : commV;
-  const afterKick = Math.max(0, gross - kick);
+  const kickAmt   = resaleKickType === 'pct' ? gross * kick / 100 : kick;
+  const afterKick = Math.max(0, gross - kickAmt);
   const agent     = afterKick * (brok/100);
 
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
@@ -5729,7 +5751,7 @@ function previewUpdate() {
   $('comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
     <div class="bd-row"><span>Gross Commission ${commType==='pct'?`(${commV}%)`:'(flat)'}</span><span>${fmt(gross)}</span></div>
-    ${kick>0?`<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>`:''}
+    ${kickAmt>0?`<div class="bd-row"><span>Kickback ${resaleKickType==='pct'?`(${kick}% of gross)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>`:''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
     <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
     ${netRow}
@@ -5766,7 +5788,7 @@ async function saveTx() {
       ...transactions[idx],
       address: addr, clientName: client, type, category,
       purchasePrice: price, closingDate: closing,
-      commType, commValue: commV, kickback: kick,
+      commType, commValue: commV, kickback: kick, kickType: resaleKickType,
       brokSplit: brok, teamMembers: members, year: closingYear
     };
     setLoading('btn-save-tx', true);
@@ -5791,7 +5813,7 @@ async function saveTx() {
   const newTx = {
     id: uid(), address: addr, clientName: client, type, category,
     purchasePrice: price, closingDate: closing,
-    commType, commValue: commV, kickback: kick,
+    commType, commValue: commV, kickback: kick, kickType: resaleKickType,
     brokSplit: brok, teamMembers: members,
     isPaid: false, year: closingYear
   };
@@ -6420,7 +6442,7 @@ function calcLeaseComm(l) {
 
 function leaseDue(startDateStr) {
   const d = new Date(startDateStr + 'T00:00:00');
-  d.setDate(d.getDate() + 30);
+  d.setDate(d.getDate() + 7);
   return d;
 }
 

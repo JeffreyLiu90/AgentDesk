@@ -661,7 +661,7 @@
     .modal-title { font-size: var(--text-xl); font-weight: var(--fw-black); margin-bottom: 1.4rem; }
 
     /* Resale View */
-    #view-resale, #view-lease, #view-preconstruction, #view-market, #view-analyzer { padding: 2rem 3.5%; }
+    #view-resale, #view-lease, #view-preconstruction, #view-market, #view-analyzer, #view-total-comm { padding: 2rem 3.5%; }
     .view-topbar { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.8rem; }
     .breadcrumb { display: flex; align-items: center; gap: var(--sp-1); font-size: var(--text-xs); color: var(--muted); margin-bottom: var(--sp-1); }
     .breadcrumb span:last-child { color: var(--navy); font-weight: var(--fw-semi); }
@@ -1611,7 +1611,7 @@
       /* Views */
       #view-resale, #view-lease, #view-preconstruction, #view-market,
       #view-directory, #view-analyzer, #view-checklist, #view-clients,
-      #view-saved-projects, #view-admin { padding:1.2rem 4%; }
+      #view-saved-projects, #view-admin, #view-total-comm { padding:1.2rem 4%; }
       .view-topbar { flex-direction:column; align-items:stretch; }
       .view-topbar .btn-add-tx { width:100%; text-align:center; justify-content:center; }
       /* Summary cards */
@@ -2878,8 +2878,9 @@
       </div>
       <!-- Year tabs -->
       <div class="year-tabs" id="tc-year-tabs"></div>
-      <!-- Toggle: Realized / Expected -->
+      <!-- Toggle: All / Realized / Expected -->
       <div class="tc-toggle-bar">
+        <button class="tc-toggle" id="tc-btn-all"      onclick="setTcMode('all')">📊 All Year</button>
         <button class="tc-toggle active" id="tc-btn-realized" onclick="setTcMode('realized')">✅ Realized</button>
         <button class="tc-toggle" id="tc-btn-expected" onclick="setTcMode('expected')">🔮 Expected</button>
         <div class="tc-toggle-info" id="tc-mode-desc">Commissions already earned (closing date passed or marked paid)</div>
@@ -3858,11 +3859,13 @@ function tcPickYear(y) { tcYear = y; renderTcYearTabs(); renderTotalComm(); }
 
 function setTcMode(mode) {
   tcMode = mode;
+  $('tc-btn-all').classList.toggle('active',      mode==='all');
   $('tc-btn-realized').classList.toggle('active', mode==='realized');
   $('tc-btn-expected').classList.toggle('active', mode==='expected');
-  $('tc-mode-desc').textContent = mode === 'realized'
-    ? 'Commissions already earned (closing date passed or marked paid)'
-    : 'Expected future commissions (upcoming closing dates and pending precon payouts)';
+  $('tc-mode-desc').textContent =
+    mode === 'realized' ? 'Commissions already earned (closing date passed or marked paid)' :
+    mode === 'expected' ? 'Expected future commissions (upcoming closing dates and pending precon payouts)' :
+    'All commissions for the year — realized and expected combined';
   renderTotalComm();
 }
 
@@ -3890,14 +3893,14 @@ function renderTotalComm() {
   leaseTxs.filter(l => l.year === yr).forEach(l => {
     const { userNet } = calcLeaseComm(l);
     const start     = l.startDate ? new Date(l.startDate + 'T00:00:00') : null;
-    const realized  = start && start <= today;
+    const realized  = l.isPaid || (start && start <= today);
     if (tcMode === 'realized' && !realized) return;
     if (tcMode === 'expected' && realized)  return;
     items.push({
       type:'lease', label: l.clientName || 'Lease Deal',
       address: l.address, amount: userNet,
       date: l.startDate,
-      status: realized ? 'paid' : 'future'
+      status: l.isPaid ? 'paid' : (start && start <= today ? 'pending' : 'future')
     });
   });
 
@@ -3995,7 +3998,7 @@ function renderTotalComm() {
         <div class="tc-breakdown-date">${i.date||'—'}</div>
       </div>
     </div>`
-  ).join('') : `<div style="text-align:center;padding:3rem;color:var(--muted)"><div style="font-size:2rem;margin-bottom:.5rem">💰</div><div style="font-weight:700">No ${tcMode} commissions for ${yr}</div><div style="font-size:.85rem;margin-top:.3rem">Try switching to ${tcMode==='realized'?'Expected':'Realized'} or select a different year</div></div>`;
+  ).join('') : `<div style="text-align:center;padding:3rem;color:var(--muted)"><div style="font-size:2rem;margin-bottom:.5rem">💰</div><div style="font-weight:700">No ${tcMode === 'all' ? '' : tcMode + ' '}commissions for ${yr}</div><div style="font-size:.85rem;margin-top:.3rem">${tcMode !== 'all' ? `Try switching to ${tcMode==='realized'?'Expected':'Realized'} or select a different year` : 'No transactions found for this year'}</div></div>`;
 }
 
 /* ════════════════════════════════════════════

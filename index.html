@@ -3701,8 +3701,8 @@
             <option value="Other">Other</option>
           </select>
         </div>
-        <div class="fg"><label>Tentative Occupancy Date</label><input type="date" id="pf-occupancy" /></div>
-        <div class="fg"><label>Final Closing Date</label><input type="date" id="pf-closing" oninput="recalcAllPayoutDates()" /></div>
+        <div class="fg"><label>Tentative Occupancy Date <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="date" id="pf-occupancy" /></div>
+        <div class="fg"><label>Final Closing Date <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="date" id="pf-closing" oninput="recalcAllPayoutDates()" /></div>
       </div>
 
       <div class="sec-divider">💰 Commission Basis</div>
@@ -3731,7 +3731,7 @@
       <button class="btn-add-member" onclick="addPreMember()">+ Add Team Member</button>
 
       <div class="sec-divider">📅 Payment Schedule</div>
-      <div class="pf-info-box">For each payout: choose the trigger date, how many days after that the payment event occurs, and how many days after the event your commission is payable. Enter the commission as <strong>%</strong> of your net (e.g. 25) or a flat <strong>$</strong> amount.</div>
+      <div class="pf-info-box">For each payout: choose the trigger date and days offset. For commission, <strong>%</strong> means % of the commission basis price (e.g. enter <strong>1</strong> if the builder pays 1% of the purchase price at this stage — brokerage and team splits apply automatically). Use <strong>$</strong> for a flat net dollar amount you receive.</div>
 
       <div class="payout-slots" id="payout-slots-container"></div>
       <button class="btn-add-member" id="btn-add-payout" onclick="addPayoutSlot()" style="margin-top:.4rem">+ Add Payout</button>
@@ -3943,8 +3943,10 @@ function renderTotalComm() {
   // ── PRECONSTRUCTION (per payout segment) ──
   preTxs.filter(p => p.year === yr).forEach(p => {
     const { userNet } = calcPreComm(p);
-    const payouts   = p.payouts || [];
+    const payouts    = p.payouts || [];
     const validCount = payouts.filter(x => x.date).length || 1;
+    const brokF      = (p.brokSplit || 100) / 100;
+    const teamF      = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0) / 100;
     if (payouts.length === 0) {
       // no segments — treat whole amount
       const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
@@ -3960,7 +3962,7 @@ function renderTotalComm() {
         if (tcMode === 'realized' && !realized) return;
         if (tcMode === 'expected' && realized)  return;
         items.push({ type:'precon', label: `${p.projectName} — ${po.label || 'Payout'}`,
-          address: p.clientName, amount: payoutAmt(po, userNet, validCount), date: po.date,
+          address: p.clientName, amount: payoutAmt(po, userNet, validCount, p.commBasis, brokF, teamF), date: po.date,
           status: po.isPaid ? 'paid' : (poDate <= today ? 'pending' : 'future') });
       });
     }
@@ -5973,7 +5975,7 @@ function preTxToRow(p, userId) {
     purchase_price: p.purchasePrice,
     purchase_date: p.purchaseDate,
     category:      p.category,
-    occupancy_date: p.occupancyDate,
+    occupancy_date: p.occupancyDate || null,
     comm_basis:    p.commBasis,
     comm_rate:     p.commRate,
     kickback:      p.kickback,
@@ -6036,9 +6038,11 @@ function renderPreSummary() {
 
     const validPayouts = p.payouts.filter(x => x.date);
     const validCount   = validPayouts.length || 1;
+    const brokF        = (p.brokSplit || 100) / 100;
+    const teamF        = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0) / 100;
 
     validPayouts.forEach(pout => {
-      const amt     = payoutAmt(pout, userNet, validCount);
+      const amt     = payoutAmt(pout, userNet, validCount, p.commBasis, brokF, teamF);
       const dueDate = new Date(pout.date + 'T00:00:00');
       if (pout.isPaid) {
         realized += amt; paidCount++;
@@ -6088,9 +6092,11 @@ function renderPreChart() {
     const { userNet } = calcPreComm(p);
     const validPayouts = p.payouts.filter(x => x.date && x.isPaid);
     const validCount   = validPayouts.length || 1;
+    const brokF        = (p.brokSplit || 100) / 100;
+    const teamF        = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0) / 100;
     validPayouts.forEach(pout => {
       const m = new Date(pout.date + 'T00:00:00').getMonth();
-      data[m] += payoutAmt(pout, userNet, validCount);
+      data[m] += payoutAmt(pout, userNet, validCount, p.commBasis, brokF, teamF);
     });
   });
 
@@ -6134,6 +6140,8 @@ function preCardHTML(p) {
   const { gross, afterKick, agent } = calcPreComm(p);
   const teamPctTotal = p.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
   const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const brokF        = (p.brokSplit || 100) / 100;
+  const teamF        = teamPctTotal / 100;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const validPayouts = p.payouts.filter(x => x.date);
@@ -6160,7 +6168,7 @@ function preCardHTML(p) {
         <div class="payout-label">${pout.label || 'Payout ' + (i+1)}</div>
         <div class="payout-date-txt">${fmtDate(pout.date)}</div>
       </div>
-      <div class="payout-amount">${fmt(payoutAmt(pout, userNet, payoutCount))}</div>
+      <div class="payout-amount">${fmt(payoutAmt(pout, userNet, payoutCount, p.commBasis, brokF, teamF))}</div>
       <div class="payout-cb-wrap">
         <input class="payout-cb" type="checkbox" ${pout.isPaid ? 'checked' : ''} onclick="togglePrePayout('${p.id}', ${i})" />
         <div class="payout-cb-lbl ${lbl}">${lblTxt}</div>
@@ -6555,13 +6563,19 @@ function syncMsSign() {
   recalcAllPayoutDates();
 }
 
-// Returns the commission amount for a single payout.
-// If pout has commValue: use it (% of userNet or flat $). Otherwise equal share.
-function payoutAmt(pout, userNet, fallbackCount) {
+// Returns the agent's net commission for a single payout slot.
+// % mode: pout.commValue is % of commBasis (purchase price) — same unit as the
+//   overall commission rate — brokFraction (e.g. 0.90) and (1-teamFraction) applied.
+// $ mode: flat dollar = agent's net receipt for this stage.
+// No commValue: equal split of userNet across fallbackCount slots.
+function payoutAmt(pout, userNet, fallbackCount, commBasis, brokFraction, teamFraction) {
   if (pout.commValue > 0) {
-    return pout.commType === 'pct'
-      ? userNet * pout.commValue / 100
-      : pout.commValue;
+    if (pout.commType === 'pct') {
+      const slotGross = (commBasis || 0) * pout.commValue / 100;
+      const slotAgent = slotGross * (brokFraction ?? 1);
+      return slotAgent * (1 - (teamFraction ?? 0));
+    }
+    return pout.commValue; // flat $ = agent's net receipt for this stage
   }
   return fallbackCount > 0 ? userNet / fallbackCount : 0;
 }
@@ -6613,13 +6627,15 @@ function prePreview() {
     if (lbl || dt) formPayouts.push({ label: lbl || `Payout ${i}`, date: dt, commType: ct, commValue: cv });
   }
   const fallbackCount = formPayouts.length || 1;
+  const brokF = brok / 100;
+  const teamF = teamPctTotal / 100;
   const payoutScheduleHTML = formPayouts.length
     ? `<div style="margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--border)">
         <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.5rem">Payout Schedule</div>
         ${formPayouts.map((po, idx) => {
-          const amt = payoutAmt(po, userNet, fallbackCount);
+          const amt = payoutAmt(po, userNet, fallbackCount, basis, brokF, teamF);
           const desc = po.commValue > 0
-            ? (po.commType === 'pct' ? `${po.commValue}% of net` : `flat ${fmt(po.commValue)}`)
+            ? (po.commType === 'pct' ? `${po.commValue}% of basis` : `flat ${fmt(po.commValue)}`)
             : `equal split (${fmt(userNet / fallbackCount)})`;
           return `<div class="bd-row"><span>${po.label || 'Payout '+(idx+1)} <span style="color:var(--muted);font-size:.8em">(${desc})</span></span><span>${fmt(amt)}</span></div>`;
         }).join('')}

@@ -2996,8 +2996,14 @@
       </div>
       <div class="chart-card">
         <div class="chart-card-head">
-          <div class="chart-card-title">Monthly Commission Earned (Preconstruction)</div>
-          <div class="chart-year-lbl" id="pre-chart-yr-lbl">—</div>
+          <div class="chart-card-title">Monthly Commission (Preconstruction)</div>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <div class="comm-type-row" style="margin:0" id="pre-chart-mode-btns">
+              <button class="ctype-btn active" id="pre-chart-paid-btn" onclick="setPreChartMode('paid')" style="padding:.25rem .55rem;font-size:.72rem">Paid</button>
+              <button class="ctype-btn" id="pre-chart-all-btn" onclick="setPreChartMode('all')" style="padding:.25rem .55rem;font-size:.72rem">All</button>
+            </div>
+            <div class="chart-year-lbl" id="pre-chart-yr-lbl">—</div>
+          </div>
         </div>
         <div class="chart-wrap"><canvas id="pre-comm-chart"></canvas></div>
       </div>
@@ -5892,6 +5898,7 @@ let preMemberCount  = 0;
 let prePayoutCount  = 1;
 let payoutCommTypes = {}; // keyed 1..N
 let preKickType     = 'dollar'; // 'dollar' | 'pct' | 'pct_price'
+let preChartMode    = 'paid';   // 'paid' | 'all'
 
 const PRE_DEMO_KEY = 'agentdesk_pre_txs';
 
@@ -6083,41 +6090,92 @@ function renderPreSummary() {
   $('pre-chart-yr-lbl').textContent = preYear;
 }
 
+function setPreChartMode(mode) {
+  preChartMode = mode;
+  $('pre-chart-paid-btn').classList.toggle('active', mode === 'paid');
+  $('pre-chart-all-btn').classList.toggle('active', mode === 'all');
+  renderPreChart();
+}
+
 function renderPreChart() {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const data   = new Array(12).fill(0);
-  const today  = new Date(); today.setHours(0,0,0,0);
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const paidData = new Array(12).fill(0);
+  const projData = new Array(12).fill(0); // expected (unpaid) per month
 
   filteredPre().forEach(p => {
     const { userNet } = calcPreComm(p);
-    const validPayouts = p.payouts.filter(x => x.date && x.isPaid);
-    const validCount   = validPayouts.length || 1;
-    const brokF        = (p.brokSplit || 100) / 100;
-    const teamF        = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0) / 100;
-    validPayouts.forEach(pout => {
-      const m = new Date(pout.date + 'T00:00:00').getMonth();
-      data[m] += payoutAmt(pout, userNet, validCount, p.commBasis, brokF, teamF);
+    const brokF = (p.brokSplit || 100) / 100;
+    const teamF = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0) / 100;
+
+    const allPayouts   = p.payouts.filter(x => x.date);
+    const validCount   = allPayouts.length || 1;
+
+    if (allPayouts.length === 0) {
+      // No payout schedule — attribute to purchase month
+      const m = new Date(p.purchaseDate + 'T00:00:00').getMonth();
+      projData[m] += userNet;
+      return;
+    }
+
+    allPayouts.forEach(pout => {
+      const m   = new Date(pout.date + 'T00:00:00').getMonth();
+      const amt = payoutAmt(pout, userNet, validCount, p.commBasis, brokF, teamF);
+      if (pout.isPaid) {
+        paidData[m] += amt;
+      } else {
+        projData[m] += amt;
+      }
     });
   });
 
   const ctx = $('pre-comm-chart').getContext('2d');
   if (preChartInst) preChartInst.destroy();
 
+  const showAll = preChartMode === 'all';
+
+  const datasets = showAll
+    ? [
+        {
+          label: 'Paid',
+          data: paidData,
+          backgroundColor: 'rgba(34,197,94,0.85)',
+          hoverBackgroundColor: 'rgba(34,197,94,1)',
+          borderRadius: 5, borderSkipped: false
+        },
+        {
+          label: 'Expected',
+          data: projData,
+          backgroundColor: 'rgba(217,119,6,0.55)',
+          hoverBackgroundColor: 'rgba(217,119,6,0.8)',
+          borderRadius: 5, borderSkipped: false
+        }
+      ]
+    : [
+        {
+          label: 'Paid',
+          data: paidData,
+          backgroundColor: paidData.map(v => v > 0 ? 'rgba(34,197,94,0.85)' : 'rgba(226,232,240,0.8)'),
+          hoverBackgroundColor: paidData.map(v => v > 0 ? 'rgba(34,197,94,1)' : 'rgba(226,232,240,1)'),
+          borderRadius: 7, borderSkipped: false
+        }
+      ];
+
   preChartInst = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: months,
-      datasets: [{ data, backgroundColor: data.map(v => v > 0 ? 'rgba(217,119,6,0.8)' : 'rgba(226,232,240,0.8)'), borderRadius: 7, borderSkipped: false, hoverBackgroundColor: data.map(v => v > 0 ? 'rgba(217,119,6,1)' : 'rgba(226,232,240,1)') }]
-    },
+    data: { labels: months, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => '  ' + fmt(ctx.raw) }, backgroundColor: '#0F172A', padding: 10, cornerRadius: 8, titleFont: { size: 11 }, bodyFont: { size: 13, weight: '700' } }
+        legend: showAll ? { display: true, position: 'top', labels: { font: { size: 11 }, color: '#64748B', usePointStyle: true, pointStyleWidth: 8, boxHeight: 8 } } : { display: false },
+        tooltip: {
+          callbacks: { label: ctx => `  ${ctx.dataset.label}: ${fmt(ctx.raw)}` },
+          backgroundColor: '#0F172A', padding: 10, cornerRadius: 8,
+          titleFont: { size: 11 }, bodyFont: { size: 12, weight: '600' }
+        }
       },
       scales: {
-        x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11 }, color: '#94A3B8' } },
-        y: { grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { font: { size: 11 }, color: '#94A3B8', callback: v => v === 0 ? '$0' : '$' + (v / 1000).toFixed(0) + 'k' } }
+        x: { stacked: false, grid: { display: false }, border: { display: false }, ticks: { font: { size: 11 }, color: '#94A3B8' } },
+        y: { stacked: false, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { font: { size: 11 }, color: '#94A3B8', callback: v => v === 0 ? '$0' : '$' + (v / 1000).toFixed(1) + 'k' } }
       },
       animation: { duration: 400 }
     }

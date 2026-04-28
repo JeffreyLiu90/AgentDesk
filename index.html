@@ -3718,155 +3718,11 @@
       <div id="pre-tm-list"></div>
       <button class="btn-add-member" onclick="addPreMember()">+ Add Team Member</button>
 
-      <div class="sec-divider">📅 Payment Schedule <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;font-size:.78rem">(up to 4 payouts)</span></div>
-      <div class="pf-info-box">For each payout: choose the trigger date, how many days after that the payment event occurs, and how many days after the event your commission is payable.</div>
+      <div class="sec-divider">📅 Payment Schedule</div>
+      <div class="pf-info-box">For each payout: choose the trigger date, how many days after that the payment event occurs, and how many days after the event your commission is payable. Enter the commission as <strong>%</strong> of your net (e.g. 25) or a flat <strong>$</strong> amount.</div>
 
-      <div class="payout-slots">
-        <!-- Payout 1 -->
-        <div class="payout-slot">
-          <div class="payout-slot-num">1</div>
-          <div class="payout-slot-content">
-            <div class="payout-slot-row">
-              <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-1" placeholder="e.g. On Signing" oninput="prePreview()" /></div>
-              <div class="fg" style="width:185px;margin-bottom:0">
-                <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                <div style="display:flex;gap:.35rem;align-items:center">
-                  <div class="comm-type-row" style="margin:0;flex-shrink:0">
-                    <button class="ctype-btn active" id="pd-ct-pct-1" onclick="setPayoutCommType(1,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
-                    <button class="ctype-btn" id="pd-ct-dlr-1" onclick="setPayoutCommType(1,'dollar')" style="padding:.28rem .55rem;font-size:.72rem">$</button>
-                  </div>
-                  <input type="number" id="pd-comm-1" placeholder="—" min="0" step="any" style="flex:1;min-width:0" oninput="prePreview()" />
-                </div>
-              </div>
-            </div>
-            <div class="payout-trigger-row">
-              <span class="pt-lbl">Trigger</span>
-              <select class="pt-select" id="pd-trigger-1" onchange="recalcPayoutDate(1)">
-                <option value="contract">Contract Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span class="pt-sep">+</span>
-              <input class="pt-days" type="number" id="pd-days-1" placeholder="0" min="0" oninput="recalcPayoutDate(1)" />
-              <span class="pt-lbl">days →</span>
-              <span class="pt-date-val" id="pd-event-display-1">—</span>
-              <div class="pt-divider"></div>
-              <span class="pt-lbl">commission due</span>
-              <input class="pt-days" type="number" id="pd-comm-days-1" placeholder="0" min="0" oninput="recalcPayoutDate(1)" />
-              <span class="pt-lbl">days later →</span>
-              <span class="pt-date-val pt-due" id="pd-date-display-1">—</span>
-              <input type="hidden" id="pd-date-1" />
-            </div>
-          </div>
-        </div>
-        <!-- Payout 2 -->
-        <div class="payout-slot">
-          <div class="payout-slot-num">2</div>
-          <div class="payout-slot-content">
-            <div class="payout-slot-row">
-              <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-2" placeholder="e.g. At 10% Deposit" oninput="prePreview()" /></div>
-              <div class="fg" style="width:185px;margin-bottom:0">
-                <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                <div style="display:flex;gap:.35rem;align-items:center">
-                  <div class="comm-type-row" style="margin:0;flex-shrink:0">
-                    <button class="ctype-btn active" id="pd-ct-pct-2" onclick="setPayoutCommType(2,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
-                    <button class="ctype-btn" id="pd-ct-dlr-2" onclick="setPayoutCommType(2,'dollar')" style="padding:.28rem .55rem;font-size:.72rem">$</button>
-                  </div>
-                  <input type="number" id="pd-comm-2" placeholder="—" min="0" step="any" style="flex:1;min-width:0" oninput="prePreview()" />
-                </div>
-              </div>
-            </div>
-            <div class="payout-trigger-row">
-              <span class="pt-lbl">Trigger</span>
-              <select class="pt-select" id="pd-trigger-2" onchange="recalcPayoutDate(2)">
-                <option value="contract">Contract Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span class="pt-sep">+</span>
-              <input class="pt-days" type="number" id="pd-days-2" placeholder="0" min="0" oninput="recalcPayoutDate(2)" />
-              <span class="pt-lbl">days →</span>
-              <span class="pt-date-val" id="pd-event-display-2">—</span>
-              <div class="pt-divider"></div>
-              <span class="pt-lbl">commission due</span>
-              <input class="pt-days" type="number" id="pd-comm-days-2" placeholder="0" min="0" oninput="recalcPayoutDate(2)" />
-              <span class="pt-lbl">days later →</span>
-              <span class="pt-date-val pt-due" id="pd-date-display-2">—</span>
-              <input type="hidden" id="pd-date-2" />
-            </div>
-          </div>
-        </div>
-        <!-- Payout 3 -->
-        <div class="payout-slot">
-          <div class="payout-slot-num">3</div>
-          <div class="payout-slot-content">
-            <div class="payout-slot-row">
-              <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-3" placeholder="e.g. At Occupancy" oninput="prePreview()" /></div>
-              <div class="fg" style="width:185px;margin-bottom:0">
-                <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                <div style="display:flex;gap:.35rem;align-items:center">
-                  <div class="comm-type-row" style="margin:0;flex-shrink:0">
-                    <button class="ctype-btn active" id="pd-ct-pct-3" onclick="setPayoutCommType(3,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
-                    <button class="ctype-btn" id="pd-ct-dlr-3" onclick="setPayoutCommType(3,'dollar')" style="padding:.28rem .55rem;font-size:.72rem">$</button>
-                  </div>
-                  <input type="number" id="pd-comm-3" placeholder="—" min="0" step="any" style="flex:1;min-width:0" oninput="prePreview()" />
-                </div>
-              </div>
-            </div>
-            <div class="payout-trigger-row">
-              <span class="pt-lbl">Trigger</span>
-              <select class="pt-select" id="pd-trigger-3" onchange="recalcPayoutDate(3)">
-                <option value="contract">Contract Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span class="pt-sep">+</span>
-              <input class="pt-days" type="number" id="pd-days-3" placeholder="0" min="0" oninput="recalcPayoutDate(3)" />
-              <span class="pt-lbl">days →</span>
-              <span class="pt-date-val" id="pd-event-display-3">—</span>
-              <div class="pt-divider"></div>
-              <span class="pt-lbl">commission due</span>
-              <input class="pt-days" type="number" id="pd-comm-days-3" placeholder="0" min="0" oninput="recalcPayoutDate(3)" />
-              <span class="pt-lbl">days later →</span>
-              <span class="pt-date-val pt-due" id="pd-date-display-3">—</span>
-              <input type="hidden" id="pd-date-3" />
-            </div>
-          </div>
-        </div>
-        <!-- Payout 4 -->
-        <div class="payout-slot">
-          <div class="payout-slot-num">4</div>
-          <div class="payout-slot-content">
-            <div class="payout-slot-row">
-              <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-4" placeholder="e.g. 60 Days Post-Closing" oninput="prePreview()" /></div>
-              <div class="fg" style="width:185px;margin-bottom:0">
-                <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                <div style="display:flex;gap:.35rem;align-items:center">
-                  <div class="comm-type-row" style="margin:0;flex-shrink:0">
-                    <button class="ctype-btn active" id="pd-ct-pct-4" onclick="setPayoutCommType(4,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
-                    <button class="ctype-btn" id="pd-ct-dlr-4" onclick="setPayoutCommType(4,'dollar')" style="padding:.28rem .55rem;font-size:.72rem">$</button>
-                  </div>
-                  <input type="number" id="pd-comm-4" placeholder="—" min="0" step="any" style="flex:1;min-width:0" oninput="prePreview()" />
-                </div>
-              </div>
-            </div>
-            <div class="payout-trigger-row">
-              <span class="pt-lbl">Trigger</span>
-              <select class="pt-select" id="pd-trigger-4" onchange="recalcPayoutDate(4)">
-                <option value="contract">Contract Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span class="pt-sep">+</span>
-              <input class="pt-days" type="number" id="pd-days-4" placeholder="0" min="0" oninput="recalcPayoutDate(4)" />
-              <span class="pt-lbl">days →</span>
-              <span class="pt-date-val" id="pd-event-display-4">—</span>
-              <div class="pt-divider"></div>
-              <span class="pt-lbl">commission due</span>
-              <input class="pt-days" type="number" id="pd-comm-days-4" placeholder="0" min="0" oninput="recalcPayoutDate(4)" />
-              <span class="pt-lbl">days later →</span>
-              <span class="pt-date-val pt-due" id="pd-date-display-4">—</span>
-              <input type="hidden" id="pd-date-4" />
-            </div>
-          </div>
-        </div>
-      </div>
+      <div class="payout-slots" id="payout-slots-container"></div>
+      <button class="btn-add-member" id="btn-add-payout" onclick="addPayoutSlot()" style="margin-top:.4rem">+ Add Payout</button>
 
       <div class="sec-divider">📋 Commission Preview</div>
       <div class="preview-box" id="pre-comm-preview"><div class="preview-empty">Fill in the details above to see your commission breakdown</div></div>
@@ -6012,8 +5868,9 @@ async function saveTx() {
 let preTxs        = [];
 let preYear       = new Date().getFullYear();
 let preChartInst  = null;
-let preMemberCount = 0;
-let payoutCommTypes = ['', 'pct', 'pct', 'pct', 'pct']; // index 1-4
+let preMemberCount  = 0;
+let prePayoutCount  = 1;
+let payoutCommTypes = {}; // keyed 1..N
 
 const PRE_DEMO_KEY = 'agentdesk_pre_txs';
 
@@ -6415,18 +6272,20 @@ function editPreTx(id) {
   $('pf-rate').value          = p.commRate;
   $('pf-kickback').value      = p.kickback || '';
   $('pf-brok').value          = p.brokSplit;
-  // Payout schedule
+  // Payout schedule — render the right number of slots first
+  prePayoutCount = Math.max(1, p.payouts.length);
+  payoutCommTypes = {};
+  renderPayoutSlots(false);
   p.payouts.forEach((pout, i) => {
-    if (i < 4) {
-      const n = i + 1;
-      $(`pd-label-${n}`).value     = pout.label     || '';
-      $(`pd-comm-${n}`).value      = pout.commValue || '';
-      setPayoutCommType(n, pout.commType || 'pct');
-      if ($(`pd-trigger-${n}`)) $(`pd-trigger-${n}`).value = pout.trigger || 'contract';
-      $(`pd-days-${n}`).value      = pout.daysAfter      != null ? pout.daysAfter      : 0;
-      $(`pd-comm-days-${n}`).value = pout.daysCommission != null ? pout.daysCommission : 0;
-      recalcPayoutDate(n);
-    }
+    const n = i + 1;
+    if ($(`pd-label-${n}`))     $(`pd-label-${n}`).value     = pout.label         || '';
+    if ($(`pd-comm-${n}`))      $(`pd-comm-${n}`).value      = pout.commValue      || '';
+    if ($(`pd-trigger-${n}`))   $(`pd-trigger-${n}`).value   = pout.trigger        || 'contract';
+    if ($(`pd-days-${n}`))      $(`pd-days-${n}`).value      = pout.daysAfter      != null ? pout.daysAfter      : 0;
+    if ($(`pd-comm-days-${n}`)) $(`pd-comm-days-${n}`).value = pout.daysCommission != null ? pout.daysCommission : 0;
+    payoutCommTypes[n] = pout.commType || 'pct';
+    setPayoutCommType(n, pout.commType || 'pct');
+    recalcPayoutDate(n);
   });
   // Team members
   $('pre-tm-list').innerHTML = '';
@@ -6452,19 +6311,9 @@ function resetPreForm() {
   $('pf-occupancy').value = '';
   $('pf-category').value = 'Condo';
   $('pf-closing').value = '';
-  for (let i = 1; i <= 4; i++) {
-    $(`pd-label-${i}`).value     = '';
-    $(`pd-days-${i}`).value      = '';
-    $(`pd-comm-days-${i}`).value = '';
-    $(`pd-date-${i}`).value      = '';
-    $(`pd-comm-${i}`).value      = '';
-    if ($(`pd-trigger-${i}`))       $(`pd-trigger-${i}`).value = 'contract';
-    const evEl = $(`pd-event-display-${i}`);
-    if (evEl)  { evEl.textContent  = '—'; evEl.style.color  = 'var(--muted)'; }
-    const duEl = $(`pd-date-display-${i}`);
-    if (duEl)  { duEl.textContent  = '—'; duEl.style.color  = 'var(--muted)'; }
-    setPayoutCommType(i, 'pct');
-  }
+  prePayoutCount = 1;
+  payoutCommTypes = {};
+  renderPayoutSlots(false);
   $('pre-tm-list').innerHTML = '';
   preMemberCount = 0;
   addPreMember(true);
@@ -6495,6 +6344,141 @@ function setPayoutCommType(n, t) {
 }
 
 /* ─── REFERRAL SCHEDULE CALCULATOR ─── */
+
+/* ── Dynamic payout slot builder ── */
+const PAYOUT_PLACEHOLDERS = [
+  'e.g. On Signing', 'e.g. At 10% Deposit',
+  'e.g. At Occupancy', 'e.g. 60 Days Post-Closing',
+  'e.g. At 80% Complete', 'e.g. At Handover'
+];
+const MAX_PAYOUTS = 6;
+
+function payoutSlotHTML(i) {
+  const ph  = PAYOUT_PLACEHOLDERS[i - 1] || `Payout ${i}`;
+  const del = prePayoutCount > 1
+    ? `<button class="btn-rm" onclick="removePayoutSlot(${i})" title="Remove" style="align-self:flex-end;margin-bottom:0;flex-shrink:0">✕</button>`
+    : '';
+  return `
+    <div class="payout-slot" id="payout-slot-${i}">
+      <div class="payout-slot-num">${i}</div>
+      <div class="payout-slot-content">
+        <div class="payout-slot-row">
+          <div class="fg" style="flex:1;margin-bottom:0">
+            <label>Payout Label</label>
+            <input type="text" id="pd-label-${i}" placeholder="${ph}" oninput="prePreview()" />
+          </div>
+          <div class="fg" style="width:185px;margin-bottom:0">
+            <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+            <div style="display:flex;gap:.35rem;align-items:center">
+              <div class="comm-type-row" style="margin:0;flex-shrink:0">
+                <button class="ctype-btn active" id="pd-ct-pct-${i}" onclick="setPayoutCommType(${i},'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
+                <button class="ctype-btn" id="pd-ct-dlr-${i}" onclick="setPayoutCommType(${i},'dollar')" style="padding:.28rem .55rem;font-size:.72rem">$</button>
+              </div>
+              <input type="number" id="pd-comm-${i}" placeholder="e.g. 25" min="0" step="any" style="flex:1;min-width:0" oninput="prePreview()" />
+            </div>
+          </div>
+          ${del}
+        </div>
+        <div class="payout-trigger-row">
+          <span class="pt-lbl">Trigger</span>
+          <select class="pt-select" id="pd-trigger-${i}" onchange="recalcPayoutDate(${i})">
+            <option value="contract">Contract Date</option>
+            <option value="closing">Final Closing</option>
+          </select>
+          <span class="pt-sep">+</span>
+          <input class="pt-days" type="number" id="pd-days-${i}" placeholder="0" min="0" oninput="recalcPayoutDate(${i})" />
+          <span class="pt-lbl">days →</span>
+          <span class="pt-date-val" id="pd-event-display-${i}">—</span>
+          <div class="pt-divider"></div>
+          <span class="pt-lbl">commission due</span>
+          <input class="pt-days" type="number" id="pd-comm-days-${i}" placeholder="0" min="0" oninput="recalcPayoutDate(${i})" />
+          <span class="pt-lbl">days later →</span>
+          <span class="pt-date-val pt-due" id="pd-date-display-${i}">—</span>
+          <input type="hidden" id="pd-date-${i}" />
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderPayoutSlots(preserveData) {
+  // Capture current values before re-rendering
+  const snap = [];
+  if (preserveData) {
+    for (let i = 1; i <= prePayoutCount; i++) {
+      snap.push({
+        label:    $(`pd-label-${i}`)?.value    || '',
+        days:     $(`pd-days-${i}`)?.value     || '',
+        commDays: $(`pd-comm-days-${i}`)?.value || '',
+        comm:     $(`pd-comm-${i}`)?.value     || '',
+        commType: payoutCommTypes[i]            || 'pct',
+        trigger:  $(`pd-trigger-${i}`)?.value  || 'contract',
+        date:     $(`pd-date-${i}`)?.value     || ''
+      });
+    }
+  }
+  const container = $('payout-slots-container');
+  container.innerHTML = '';
+  for (let i = 1; i <= prePayoutCount; i++) {
+    container.insertAdjacentHTML('beforeend', payoutSlotHTML(i));
+  }
+  // Restore values and types
+  snap.forEach((s, idx) => {
+    const i = idx + 1;
+    if ($(`pd-label-${i}`))    $(`pd-label-${i}`).value    = s.label;
+    if ($(`pd-days-${i}`))     $(`pd-days-${i}`).value     = s.days;
+    if ($(`pd-comm-days-${i}`))$(`pd-comm-days-${i}`).value= s.commDays;
+    if ($(`pd-comm-${i}`))     $(`pd-comm-${i}`).value     = s.comm;
+    if ($(`pd-date-${i}`))     $(`pd-date-${i}`).value     = s.date;
+    if ($(`pd-trigger-${i}`))  $(`pd-trigger-${i}`).value  = s.trigger;
+    payoutCommTypes[i] = s.commType;
+    setPayoutCommType(i, s.commType);
+  });
+  // Show/hide Add button
+  const btn = $('btn-add-payout');
+  if (btn) btn.style.display = prePayoutCount >= MAX_PAYOUTS ? 'none' : '';
+  recalcAllPayoutDates();
+}
+
+function addPayoutSlot() {
+  if (prePayoutCount >= MAX_PAYOUTS) return;
+  prePayoutCount++;
+  renderPayoutSlots(true);
+  prePreview();
+}
+
+function removePayoutSlot(n) {
+  if (prePayoutCount <= 1) return;
+  // Snapshot all current values
+  const snap = [];
+  for (let i = 1; i <= prePayoutCount; i++) {
+    snap.push({
+      label:    $(`pd-label-${i}`)?.value     || '',
+      days:     $(`pd-days-${i}`)?.value      || '',
+      commDays: $(`pd-comm-days-${i}`)?.value || '',
+      comm:     $(`pd-comm-${i}`)?.value      || '',
+      commType: payoutCommTypes[i]             || 'pct',
+      trigger:  $(`pd-trigger-${i}`)?.value   || 'contract',
+      date:     $(`pd-date-${i}`)?.value      || ''
+    });
+  }
+  snap.splice(n - 1, 1);   // remove slot n (1-indexed)
+  prePayoutCount--;
+  // Rebuild commTypes map from remaining snap
+  snap.forEach((s, idx) => { payoutCommTypes[idx + 1] = s.commType; });
+  renderPayoutSlots(false); // render fresh, then restore from snap
+  snap.forEach((s, idx) => {
+    const i = idx + 1;
+    if ($(`pd-label-${i}`))     $(`pd-label-${i}`).value     = s.label;
+    if ($(`pd-days-${i}`))      $(`pd-days-${i}`).value      = s.days;
+    if ($(`pd-comm-days-${i}`)) $(`pd-comm-days-${i}`).value = s.commDays;
+    if ($(`pd-comm-${i}`))      $(`pd-comm-${i}`).value      = s.comm;
+    if ($(`pd-date-${i}`))      $(`pd-date-${i}`).value      = s.date;
+    if ($(`pd-trigger-${i}`))   $(`pd-trigger-${i}`).value   = s.trigger;
+    setPayoutCommType(i, s.commType);
+  });
+  recalcAllPayoutDates();
+  prePreview();
+}
 
 function addDaysToDate(dateStr, days) {
   if (!dateStr) return '';
@@ -6584,7 +6568,7 @@ function prePreview() {
 
   // Build payout schedule preview from form inputs
   const formPayouts = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= prePayoutCount; i++) {
     const lbl = $(`pd-label-${i}`)?.value.trim();
     const dt  = $(`pd-date-${i}`)?.value;
     const cv  = parseFloat($(`pd-comm-${i}`)?.value) || 0;
@@ -6598,8 +6582,8 @@ function prePreview() {
         ${formPayouts.map((po, idx) => {
           const amt = payoutAmt(po, userNet, fallbackCount);
           const desc = po.commValue > 0
-            ? (po.commType === 'pct' ? `${po.commValue}% of your net` : 'flat')
-            : `1/${fallbackCount} equal share`;
+            ? (po.commType === 'pct' ? `${po.commValue}% of net` : `flat ${fmt(po.commValue)}`)
+            : `equal split (${fmt(userNet / fallbackCount)})`;
           return `<div class="bd-row"><span>${po.label || 'Payout '+(idx+1)} <span style="color:var(--muted);font-size:.8em">(${desc})</span></span><span>${fmt(amt)}</span></div>`;
         }).join('')}
       </div>`
@@ -6639,10 +6623,10 @@ async function savePre() {
   })).filter(m => m.name && m.pct > 0);
 
   const payouts = [];
-  for (let i = 1; i <= 4; i++) {
-    const label          = $(`pd-label-${i}`).value.trim();
-    const date           = $(`pd-date-${i}`).value;   // commission due date (from recalcPayoutDate)
-    const commValue      = parseFloat($(`pd-comm-${i}`).value) || 0;
+  for (let i = 1; i <= prePayoutCount; i++) {
+    const label          = $(`pd-label-${i}`)?.value.trim() || '';
+    const date           = $(`pd-date-${i}`)?.value || '';  // commission due date
+    const commValue      = parseFloat($(`pd-comm-${i}`)?.value) || 0;
     const commType       = payoutCommTypes[i] || 'pct';
     const trigger        = $(`pd-trigger-${i}`)?.value    || 'contract';
     const daysAfter      = parseInt($(`pd-days-${i}`)?.value)      || 0;

@@ -3524,8 +3524,9 @@
           <label>Kickback</label>
           <div style="display:flex;gap:.4rem;align-items:center">
             <div class="comm-type-row" style="margin:0;flex-shrink:0">
-              <button class="ctype-btn active" id="rkt-dollar" onclick="setResaleKickType('dollar')" style="padding:.3rem .6rem;font-size:.75rem">$</button>
-              <button class="ctype-btn"        id="rkt-pct"    onclick="setResaleKickType('pct')"    style="padding:.3rem .6rem;font-size:.75rem">%</button>
+              <button class="ctype-btn active" id="rkt-dollar"    onclick="setResaleKickType('dollar')"    title="Flat dollar amount" style="padding:.3rem .6rem;font-size:.75rem">$</button>
+              <button class="ctype-btn"        id="rkt-pct"       onclick="setResaleKickType('pct')"       title="% of gross commission" style="padding:.3rem .6rem;font-size:.75rem">%</button>
+              <button class="ctype-btn"        id="rkt-pct-price" onclick="setResaleKickType('pct_price')" title="% of purchase price" style="padding:.3rem .6rem;font-size:.75rem">%P</button>
             </div>
             <input type="number" id="f-kickback" placeholder="0" min="0" style="flex:1" oninput="previewUpdate()" />
           </div>
@@ -3636,8 +3637,9 @@
           <label>Kickback</label>
           <div style="display:flex;gap:.4rem;align-items:center">
             <div class="comm-type-row" style="margin:0;flex-shrink:0">
-              <button class="ctype-btn active" id="lkt-dollar" onclick="setLeaseKickType('dollar')" style="padding:.3rem .6rem;font-size:.75rem">$</button>
-              <button class="ctype-btn"        id="lkt-pct"    onclick="setLeaseKickType('pct')"    style="padding:.3rem .6rem;font-size:.75rem">%</button>
+              <button class="ctype-btn active" id="lkt-dollar"    onclick="setLeaseKickType('dollar')"    title="Flat dollar amount" style="padding:.3rem .6rem;font-size:.75rem">$</button>
+              <button class="ctype-btn"        id="lkt-pct"       onclick="setLeaseKickType('pct')"       title="% of gross commission" style="padding:.3rem .6rem;font-size:.75rem">%</button>
+              <button class="ctype-btn"        id="lkt-pct-price" onclick="setLeaseKickType('pct_price')" title="% of monthly rent" style="padding:.3rem .6rem;font-size:.75rem">%P</button>
             </div>
             <input type="number" id="lf-kickback" placeholder="0" min="0" style="flex:1" oninput="leasePreview()" />
           </div>
@@ -3710,7 +3712,17 @@
         <div class="fg"><label>Commission Rate (%) *</label><input type="number" id="pf-rate" placeholder="2.5" step="0.01" min="0" oninput="prePreview()" /></div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>Kickback Amount ($)</label><input type="number" id="pf-kickback" placeholder="0" min="0" oninput="prePreview()" /></div>
+        <div class="fg">
+          <label>Kickback</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <div class="comm-type-row" style="margin:0;flex-shrink:0">
+              <button class="ctype-btn active" id="pkt-dollar"    onclick="setPreKickType('dollar')"    title="Flat dollar amount" style="padding:.3rem .6rem;font-size:.75rem">$</button>
+              <button class="ctype-btn"        id="pkt-pct"       onclick="setPreKickType('pct')"       title="% of gross commission" style="padding:.3rem .6rem;font-size:.75rem">%</button>
+              <button class="ctype-btn"        id="pkt-pct-price" onclick="setPreKickType('pct_price')" title="% of purchase price" style="padding:.3rem .6rem;font-size:.75rem">%P</button>
+            </div>
+            <input type="number" id="pf-kickback" placeholder="0" min="0" style="flex:1" oninput="prePreview()" />
+          </div>
+        </div>
         <div class="fg"><label>Your Brokerage Split (%) *</label><input type="number" id="pf-brok" placeholder="80" min="0" max="100" oninput="prePreview()" /></div>
       </div>
 
@@ -3786,7 +3798,9 @@ const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2)
 
 function calcComm(t) {
   const gross        = t.commType === 'pct' ? (t.purchasePrice * t.commValue / 100) : (t.commValue || 0);
-  const kickAmt      = t.kickType === 'pct' ? gross * (t.kickback || 0) / 100 : (t.kickback || 0);
+  const kickAmt      = t.kickType === 'pct'       ? gross * (t.kickback || 0) / 100
+                     : t.kickType === 'pct_price' ? (t.purchasePrice || 0) * (t.kickback || 0) / 100
+                     : (t.kickback || 0);
   const afterKick    = Math.max(0, gross - kickAmt);
   const agent        = afterKick * ((t.brokSplit || 100) / 100);
   const teamPct      = (t.teamMembers || []).reduce((s,m) => s + m.pct, 0);
@@ -5715,6 +5729,8 @@ function setResaleKickType(t) {
   resaleKickType = t;
   $('rkt-dollar').classList.toggle('active', t === 'dollar');
   $('rkt-pct').classList.toggle('active', t === 'pct');
+  $('rkt-pct-price').classList.toggle('active', t === 'pct_price');
+  $('f-kickback').placeholder = t === 'pct_price' ? '% of price' : '0';
   previewUpdate();
 }
 
@@ -5751,7 +5767,9 @@ function previewUpdate() {
   }
 
   const gross     = commType==='pct' ? price*commV/100 : commV;
-  const kickAmt   = resaleKickType === 'pct' ? gross * kick / 100 : kick;
+  const kickAmt   = resaleKickType === 'pct'       ? gross * kick / 100
+                  : resaleKickType === 'pct_price'  ? price * kick / 100
+                  : kick;
   const afterKick = Math.max(0, gross - kickAmt);
   const agent     = afterKick * (brok/100);
 
@@ -5776,7 +5794,7 @@ function previewUpdate() {
   $('comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
     <div class="bd-row"><span>Gross Commission ${commType==='pct'?`(${commV}%)`:'(flat)'}</span><span>${fmt(gross)}</span></div>
-    ${kickAmt>0?`<div class="bd-row"><span>Kickback ${resaleKickType==='pct'?`(${kick}% of gross)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>`:''}
+    ${kickAmt>0?`<div class="bd-row"><span>Kickback ${resaleKickType==='pct'?`(${kick}% of gross)`:resaleKickType==='pct_price'?`(${kick}% of price)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>`:''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
     <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
     ${netRow}
@@ -5871,6 +5889,7 @@ let preChartInst  = null;
 let preMemberCount  = 0;
 let prePayoutCount  = 1;
 let payoutCommTypes = {}; // keyed 1..N
+let preKickType     = 'dollar'; // 'dollar' | 'pct' | 'pct_price'
 
 const PRE_DEMO_KEY = 'agentdesk_pre_txs';
 
@@ -5879,12 +5898,15 @@ function savePreDemoTxs() {
 }
 
 function calcPreComm(p) {
-  const gross     = (p.commBasis || 0) * (p.commRate || 0) / 100;
-  const afterKick = Math.max(0, gross - (p.kickback || 0));
+  const gross   = (p.commBasis || 0) * (p.commRate || 0) / 100;
+  const kickAmt = p.kickType === 'pct'       ? gross * (p.kickback || 0) / 100
+                : p.kickType === 'pct_price' ? (p.purchasePrice || 0) * (p.kickback || 0) / 100
+                : (p.kickback || 0);
+  const afterKick = Math.max(0, gross - kickAmt);
   const agent     = afterKick * ((p.brokSplit || 100) / 100);
   const teamPct   = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0);
   const userNet   = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
-  return { gross, afterKick, agent, userNet };
+  return { gross, afterKick, agent, userNet, kickAmt };
 }
 
 function getPreDemoSeed() {
@@ -6272,6 +6294,7 @@ function editPreTx(id) {
   $('pf-rate').value          = p.commRate;
   $('pf-kickback').value      = p.kickback || '';
   $('pf-brok').value          = p.brokSplit;
+  setPreKickType(p.kickType || 'dollar');
   // Payout schedule — render the right number of slots first
   prePayoutCount = Math.max(1, p.payouts.length);
   payoutCommTypes = {};
@@ -6303,6 +6326,15 @@ function editPreTx(id) {
   prePreview();
 }
 
+function setPreKickType(t) {
+  preKickType = t;
+  $('pkt-dollar').classList.toggle('active', t === 'dollar');
+  $('pkt-pct').classList.toggle('active', t === 'pct');
+  $('pkt-pct-price').classList.toggle('active', t === 'pct_price');
+  $('pf-kickback').placeholder = t === 'pct_price' ? '% of price' : '0';
+  prePreview();
+}
+
 function resetPreForm() {
   ['pf-project','pf-client','pf-price','pf-basis','pf-rate','pf-kickback','pf-brok'].forEach(id => {
     const el = $(id); if (el) el.value = '';
@@ -6314,6 +6346,7 @@ function resetPreForm() {
   prePayoutCount = 1;
   payoutCommTypes = {};
   renderPayoutSlots(false);
+  setPreKickType('dollar');
   $('pre-tm-list').innerHTML = '';
   preMemberCount = 0;
   addPreMember(true);
@@ -6534,10 +6567,11 @@ function payoutAmt(pout, userNet, fallbackCount) {
 }
 
 function prePreview() {
-  const basis = parseFloat($('pf-basis').value) || 0;
-  const rate  = parseFloat($('pf-rate').value)  || 0;
-  const kick  = parseFloat($('pf-kickback').value) || 0;
-  const brok  = parseFloat($('pf-brok').value) || 0;
+  const basis  = parseFloat($('pf-basis').value) || 0;
+  const rate   = parseFloat($('pf-rate').value)  || 0;
+  const kick   = parseFloat($('pf-kickback').value) || 0;
+  const brok   = parseFloat($('pf-brok').value) || 0;
+  const price  = parseFloat($('pf-price').value) || 0;
 
   if (!basis && !rate) {
     $('pre-comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
@@ -6545,7 +6579,10 @@ function prePreview() {
   }
 
   const gross     = basis * rate / 100;
-  const afterKick = Math.max(0, gross - kick);
+  const kickAmt   = preKickType === 'pct'       ? gross * kick / 100
+                  : preKickType === 'pct_price'  ? price * kick / 100
+                  : kick;
+  const afterKick = Math.max(0, gross - kickAmt);
   const agent     = afterKick * (brok / 100);
 
   const members = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
@@ -6592,7 +6629,7 @@ function prePreview() {
   $('pre-comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
     <div class="bd-row"><span>Gross Commission (${rate}% of ${fmt(basis)})</span><span>${fmt(gross)}</span></div>
-    ${kick > 0 ? `<div class="bd-row"><span>Kickback</span><span class="neg">−${fmt(kick)}</span></div>` : ''}
+    ${kickAmt > 0 ? `<div class="bd-row"><span>Kickback ${preKickType==='pct'?`(${kick}% of gross)`:preKickType==='pct_price'?`(${kick}% of price)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
     <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
     ${netRow}
@@ -6611,6 +6648,7 @@ async function savePre() {
   const commBasis        = parseFloat($('pf-basis').value);
   const commRate      = parseFloat($('pf-rate').value);
   const kickback      = parseFloat($('pf-kickback').value) || 0;
+  const kickType      = preKickType;
   const brokSplit     = parseFloat($('pf-brok').value);
 
   if (!projectName || !clientName || !purchaseDate || isNaN(purchasePrice) || isNaN(commBasis) || isNaN(commRate) || isNaN(brokSplit)) {
@@ -6649,7 +6687,7 @@ async function savePre() {
     const updated = {
       ...preTxs[idx],
       projectName, clientName, purchasePrice, purchaseDate,
-      category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, brokSplit,
+      category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, kickType, brokSplit,
       teamMembers, payouts: mergedPayouts, year: txYear
     };
     setLoading('btn-save-pre', true);
@@ -6673,7 +6711,7 @@ async function savePre() {
   /* ── ADD MODE ── */
   const newPre = {
     id: uid(), projectName, clientName, purchasePrice, purchaseDate,
-    category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, brokSplit,
+    category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, kickType, brokSplit,
     teamMembers, payouts, year: txYear
   };
 
@@ -6717,7 +6755,9 @@ function calcLeaseComm(l) {
   const monthlyRent = l.monthlyRent || 0;
   const annualRent  = monthlyRent * 12;
   const gross       = l.commType === 'pct' ? monthlyRent * (l.commValue || 0) / 100 : (l.commValue || 0);
-  const kickAmt     = l.kickType === 'pct' ? gross * (l.kickback || 0) / 100 : (l.kickback || 0);
+  const kickAmt     = l.kickType === 'pct'       ? gross * (l.kickback || 0) / 100
+                    : l.kickType === 'pct_price' ? monthlyRent * (l.kickback || 0) / 100
+                    : (l.kickback || 0);
   const afterKick   = Math.max(0, gross - kickAmt);
   const agent       = afterKick * ((l.brokSplit || 100) / 100);
   const teamPct     = (l.teamMembers || []).reduce((s,m) => s + m.pct, 0);
@@ -7140,6 +7180,7 @@ function resetLeaseForm() {
   leaseKickType = 'dollar';
   $('lkt-dollar').classList.add('active');
   $('lkt-pct').classList.remove('active');
+  $('lkt-pct-price').classList.remove('active');
   $('lease-comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
 }
 
@@ -7147,7 +7188,8 @@ function setLeaseKickType(t) {
   leaseKickType = t;
   $('lkt-dollar').classList.toggle('active', t === 'dollar');
   $('lkt-pct').classList.toggle('active', t === 'pct');
-  $('lf-kickback').placeholder = t === 'pct' ? '0' : '0';
+  $('lkt-pct-price').classList.toggle('active', t === 'pct_price');
+  $('lf-kickback').placeholder = t === 'pct_price' ? '% of rent' : '0';
   leasePreview();
 }
 
@@ -7193,7 +7235,9 @@ function leasePreview() {
   }
 
   const gross      = leaseCommType === 'pct' ? rent * comm / 100 : comm;
-  const kickAmt    = leaseKickType === 'pct' ? gross * kick / 100 : kick;
+  const kickAmt    = leaseKickType === 'pct'       ? gross * kick / 100
+                   : leaseKickType === 'pct_price'  ? rent * kick / 100
+                   : kick;
   const afterKick  = Math.max(0, gross - kickAmt);
   const agent      = afterKick * (brok / 100);
 
@@ -7210,7 +7254,9 @@ function leasePreview() {
     : '';
 
   const basisDesc = leaseCommType === 'pct' ? `${comm}% of 1st month rent (${fmt(rent)})` : 'Flat fee';
-  const kickDesc  = leaseKickType === 'pct' ? `Kickback (${kick}% of gross)` : 'Kickback';
+  const kickDesc  = leaseKickType === 'pct'       ? `Kickback (${kick}% of gross)`
+                  : leaseKickType === 'pct_price'  ? `Kickback (${kick}% of monthly rent)`
+                  : 'Kickback';
 
   const netRow = teamPctTotal > 0
     ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>

@@ -688,8 +688,22 @@
     .sum-label { font-size: var(--text-xs); font-weight: var(--fw-bold); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem; }
     .sum-value { font-size: 1.45rem; font-weight: var(--fw-black); color: var(--text); }
     .sum-value.c-success { color: var(--success); }
-    .sum-value.c-danger { color: var(--danger); }
+    .sum-value.c-danger  { color: var(--danger); }
+    .sum-value.c-primary { color: var(--primary); }
     .sum-sub { font-size: var(--text-xs); color: var(--muted); margin-top: 0.2rem; }
+
+    /* Preconstruction progress bar */
+    .pre-progress-bar-wrap { background:var(--white); border:1px solid var(--border); border-radius:var(--r-xl); padding:1rem 1.4rem 1.1rem; box-shadow:var(--shadow-xs); margin-bottom:1.4rem; }
+    .pre-progress-bar { display:flex; height:10px; border-radius:99px; overflow:hidden; background:var(--surface); gap:2px; margin-bottom:.65rem; }
+    .pre-pb-segment { height:100%; border-radius:99px; transition:width .4s ease; min-width:0; }
+    .pb-realized { background:var(--success); }
+    .pb-incoming { background:var(--primary); }
+    .pb-overdue  { background:var(--danger); }
+    .pre-pb-legend { display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.75rem; color:var(--muted); align-items:center; }
+    .pb-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.3rem; }
+    .pb-dot-realized { background:var(--success); }
+    .pb-dot-incoming { background:var(--primary); }
+    .pb-dot-overdue  { background:var(--danger); }
 
     .chart-card { background: var(--white); border-radius: var(--r-xl); padding: 1.4rem; border: 1px solid var(--border); margin-bottom: 1.4rem; box-shadow: var(--shadow-xs); }
     .chart-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; }
@@ -2972,9 +2986,21 @@
       <div class="year-tabs" id="pre-year-tabs"></div>
       <div class="summary-row">
         <div class="sum-card"><div class="sum-label">Total Projects</div><div class="sum-value" id="ps-deals">—</div><div class="sum-sub">this year</div></div>
-        <div class="sum-card"><div class="sum-label">Total Net Earned</div><div class="sum-value c-success" id="ps-earned">—</div><div class="sum-sub">confirmed payouts</div></div>
-        <div class="sum-card"><div class="sum-label">Paid Payouts</div><div class="sum-value" id="ps-paid">—</div><div class="sum-sub" id="ps-paid-sub">0 payouts</div></div>
-        <div class="sum-card"><div class="sum-label">Outstanding</div><div class="sum-value c-danger" id="ps-outstanding">—</div><div class="sum-sub" id="ps-outstanding-sub">0 overdue</div></div>
+        <div class="sum-card"><div class="sum-label">Total Earned</div><div class="sum-value" id="ps-earned">—</div><div class="sum-sub" id="ps-earned-sub">net commission</div></div>
+        <div class="sum-card"><div class="sum-label">Realized</div><div class="sum-value c-success" id="ps-paid">—</div><div class="sum-sub" id="ps-paid-sub">0 paid</div></div>
+        <div class="sum-card"><div class="sum-label">Incoming</div><div class="sum-value c-primary" id="ps-incoming">—</div><div class="sum-sub" id="ps-incoming-sub">0 upcoming</div></div>
+      </div>
+      <div class="pre-progress-bar-wrap" id="pre-progress-wrap" style="display:none">
+        <div class="pre-progress-bar" id="pre-progress-bar">
+          <div class="pre-pb-segment pb-realized" id="pb-realized" title="Realized"></div>
+          <div class="pre-pb-segment pb-incoming" id="pb-incoming" title="Incoming"></div>
+          <div class="pre-pb-segment pb-overdue"  id="pb-overdue"  title="Overdue"></div>
+        </div>
+        <div class="pre-pb-legend">
+          <span class="pb-dot pb-dot-realized"></span><span id="pb-lbl-realized">Realized $0</span>
+          <span class="pb-dot pb-dot-incoming"></span><span id="pb-lbl-incoming">Incoming $0</span>
+          <span class="pb-dot pb-dot-overdue"></span><span id="pb-lbl-overdue">Overdue $0</span>
+        </div>
       </div>
       <div class="chart-card">
         <div class="chart-card-head">
@@ -3668,7 +3694,7 @@
       </div>
       <div class="form-row">
         <div class="fg"><label>Purchase Price ($) *</label><input type="number" id="pf-price" placeholder="850000" min="0" oninput="prePreview()" /></div>
-        <div class="fg"><label>Purchase Date *</label><input type="date" id="pf-purchase-date" oninput="syncMsSign()" /></div>
+        <div class="fg"><label>Contract Date *</label><input type="date" id="pf-purchase-date" oninput="syncMsSign()" /></div>
       </div>
       <div class="form-row">
         <div class="fg"><label>Property Category *</label>
@@ -3700,15 +3726,23 @@
       <button class="btn-add-member" onclick="addPreMember()">+ Add Team Member</button>
 
       <div class="sec-divider">📅 Payment Schedule <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;font-size:.78rem">(up to 4 payouts)</span></div>
-      <div class="pf-info-box">Enter the expected payout dates for this project. Preconstruction commissions are typically paid in stages — e.g. on signing, at 10% deposit, at occupancy, and 60 days post-closing.</div>
+      <div class="pf-info-box">Set how many days after the contract date each payout is due. The date calculates automatically. Commission amount can be a % of your net or a fixed $.</div>
 
       <div class="payout-slots">
         <div class="payout-slot">
           <div class="payout-slot-num">1</div>
-          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-1" placeholder="e.g. On Signing, 10% Deposit..." oninput="prePreview()" /></div>
-          <div class="fg" style="width:145px;margin-bottom:0"><label>Expected Date</label><input type="date" id="pd-date-1" onchange="prePreview()" /></div>
-          <div class="fg" style="width:190px;margin-bottom:0">
-            <label>Commission Amount <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-1" placeholder="e.g. On Signing" oninput="prePreview()" /></div>
+          <div class="fg" style="width:160px;margin-bottom:0">
+            <label>Days After Contract</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="number" id="pd-days-1" placeholder="0" min="0" style="width:70px;text-align:center" oninput="recalcPayoutDate(1)" />
+              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
+            </div>
+            <div style="font-size:.72rem;margin-top:.25rem;font-weight:600" id="pd-date-display-1">—</div>
+            <input type="hidden" id="pd-date-1" />
+          </div>
+          <div class="fg" style="width:185px;margin-bottom:0">
+            <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
             <div style="display:flex;gap:.35rem;align-items:center">
               <div class="comm-type-row" style="margin:0;flex-shrink:0">
                 <button class="ctype-btn active" id="pd-ct-pct-1" onclick="setPayoutCommType(1,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
@@ -3720,10 +3754,18 @@
         </div>
         <div class="payout-slot">
           <div class="payout-slot-num">2</div>
-          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-2" placeholder="e.g. At Occupancy..." oninput="prePreview()" /></div>
-          <div class="fg" style="width:145px;margin-bottom:0"><label>Expected Date</label><input type="date" id="pd-date-2" onchange="prePreview()" /></div>
-          <div class="fg" style="width:190px;margin-bottom:0">
-            <label>Commission Amount <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-2" placeholder="e.g. At 10% Deposit" oninput="prePreview()" /></div>
+          <div class="fg" style="width:160px;margin-bottom:0">
+            <label>Days After Contract</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="number" id="pd-days-2" placeholder="0" min="0" style="width:70px;text-align:center" oninput="recalcPayoutDate(2)" />
+              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
+            </div>
+            <div style="font-size:.72rem;margin-top:.25rem;font-weight:600" id="pd-date-display-2">—</div>
+            <input type="hidden" id="pd-date-2" />
+          </div>
+          <div class="fg" style="width:185px;margin-bottom:0">
+            <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
             <div style="display:flex;gap:.35rem;align-items:center">
               <div class="comm-type-row" style="margin:0;flex-shrink:0">
                 <button class="ctype-btn active" id="pd-ct-pct-2" onclick="setPayoutCommType(2,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
@@ -3735,10 +3777,18 @@
         </div>
         <div class="payout-slot">
           <div class="payout-slot-num">3</div>
-          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-3" placeholder="e.g. 30 Days Post-Closing..." oninput="prePreview()" /></div>
-          <div class="fg" style="width:145px;margin-bottom:0"><label>Expected Date</label><input type="date" id="pd-date-3" onchange="prePreview()" /></div>
-          <div class="fg" style="width:190px;margin-bottom:0">
-            <label>Commission Amount <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-3" placeholder="e.g. At Occupancy" oninput="prePreview()" /></div>
+          <div class="fg" style="width:160px;margin-bottom:0">
+            <label>Days After Contract</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="number" id="pd-days-3" placeholder="0" min="0" style="width:70px;text-align:center" oninput="recalcPayoutDate(3)" />
+              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
+            </div>
+            <div style="font-size:.72rem;margin-top:.25rem;font-weight:600" id="pd-date-display-3">—</div>
+            <input type="hidden" id="pd-date-3" />
+          </div>
+          <div class="fg" style="width:185px;margin-bottom:0">
+            <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
             <div style="display:flex;gap:.35rem;align-items:center">
               <div class="comm-type-row" style="margin:0;flex-shrink:0">
                 <button class="ctype-btn active" id="pd-ct-pct-3" onclick="setPayoutCommType(3,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
@@ -3750,10 +3800,18 @@
         </div>
         <div class="payout-slot">
           <div class="payout-slot-num">4</div>
-          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-4" placeholder="e.g. 60 Days Post-Closing..." oninput="prePreview()" /></div>
-          <div class="fg" style="width:145px;margin-bottom:0"><label>Expected Date</label><input type="date" id="pd-date-4" onchange="prePreview()" /></div>
-          <div class="fg" style="width:190px;margin-bottom:0">
-            <label>Commission Amount <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <div class="fg" style="flex:1;margin-bottom:0"><label>Payout Label</label><input type="text" id="pd-label-4" placeholder="e.g. 60 Days Post-Closing" oninput="prePreview()" /></div>
+          <div class="fg" style="width:160px;margin-bottom:0">
+            <label>Days After Contract</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="number" id="pd-days-4" placeholder="0" min="0" style="width:70px;text-align:center" oninput="recalcPayoutDate(4)" />
+              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
+            </div>
+            <div style="font-size:.72rem;margin-top:.25rem;font-weight:600" id="pd-date-display-4">—</div>
+            <input type="hidden" id="pd-date-4" />
+          </div>
+          <div class="fg" style="width:185px;margin-bottom:0">
+            <label>Commission <span style="color:var(--muted);font-weight:400">(optional)</span></label>
             <div style="display:flex;gap:.35rem;align-items:center">
               <div class="comm-type-row" style="margin:0;flex-shrink:0">
                 <button class="ctype-btn active" id="pd-ct-pct-4" onclick="setPayoutCommType(4,'pct')" style="padding:.28rem .55rem;font-size:.72rem">%</button>
@@ -6160,31 +6218,55 @@ function pickPreYear(y) { preYear = y; renderPreYearTabs(); renderPreSummary(); 
 function renderPreSummary() {
   const list = filteredPre();
   const today = new Date(); today.setHours(0,0,0,0);
-  let totalAgent = 0, totalPaid = 0, totalOverdue = 0, paidCount = 0, overdueCount = 0;
+  let totalEarned = 0, realized = 0, incoming = 0, overdue = 0;
+  let paidCount = 0, incomingCount = 0, overdueCount = 0;
 
   list.forEach(p => {
     const { userNet } = calcPreComm(p);
-    const validCount = p.payouts.filter(x => x.date).length || 1;
+    totalEarned += userNet;
 
-    p.payouts.forEach(pout => {
-      if (!pout.date) return;
+    const validPayouts = p.payouts.filter(x => x.date);
+    const validCount   = validPayouts.length || 1;
+
+    validPayouts.forEach(pout => {
       const amt     = payoutAmt(pout, userNet, validCount);
       const dueDate = new Date(pout.date + 'T00:00:00');
       if (pout.isPaid) {
-        totalPaid += amt; paidCount++;
+        realized += amt; paidCount++;
       } else if (dueDate < today) {
-        totalOverdue += amt; overdueCount++;
+        overdue += amt; overdueCount++;
+      } else {
+        incoming += amt; incomingCount++;
       }
     });
-    totalAgent += userNet;
   });
 
-  $('ps-deals').textContent        = list.length;
-  $('ps-earned').textContent       = fmt(totalAgent);
-  $('ps-paid').textContent         = fmt(totalPaid);
-  $('ps-paid-sub').textContent     = `${paidCount} payout${paidCount !== 1 ? 's' : ''}`;
-  $('ps-outstanding').textContent  = fmt(totalOverdue);
-  $('ps-outstanding-sub').textContent = `${overdueCount} overdue`;
+  // Summary cards
+  $('ps-deals').textContent      = list.length;
+  $('ps-earned').textContent     = fmt(totalEarned);
+  $('ps-earned-sub').textContent = `across ${list.length} project${list.length !== 1 ? 's' : ''}`;
+  $('ps-paid').textContent       = fmt(realized);
+  $('ps-paid-sub').textContent   = `${paidCount} paid payout${paidCount !== 1 ? 's' : ''}`;
+  $('ps-incoming').textContent   = fmt(incoming + overdue);
+  $('ps-incoming-sub').textContent = overdueCount > 0
+    ? `${incomingCount} upcoming · ${overdueCount} overdue`
+    : `${incomingCount} upcoming payout${incomingCount !== 1 ? 's' : ''}`;
+
+  // Progress bar
+  const total = realized + incoming + overdue;
+  const wrap = $('pre-progress-wrap');
+  if (total > 0) {
+    wrap.style.display = '';
+    $('pb-realized').style.width = ((realized / total) * 100).toFixed(1) + '%';
+    $('pb-incoming').style.width = ((incoming / total) * 100).toFixed(1) + '%';
+    $('pb-overdue').style.width  = ((overdue  / total) * 100).toFixed(1) + '%';
+    $('pb-lbl-realized').textContent = `Realized ${fmt(realized)}`;
+    $('pb-lbl-incoming').textContent = `Incoming ${fmt(incoming)}`;
+    $('pb-lbl-overdue').textContent  = `Overdue ${fmt(overdue)}`;
+  } else {
+    wrap.style.display = 'none';
+  }
+
   $('pre-chart-yr-lbl').textContent = preYear;
 }
 
@@ -6405,10 +6487,18 @@ function editPreTx(id) {
   // Payout schedule
   p.payouts.forEach((pout, i) => {
     if (i < 4) {
-      $(`pd-label-${i+1}`).value = pout.label     || '';
-      $(`pd-date-${i+1}`).value  = pout.date      || '';
-      $(`pd-comm-${i+1}`).value  = pout.commValue || '';
-      setPayoutCommType(i + 1, pout.commType || 'pct');
+      const n = i + 1;
+      $(`pd-label-${n}`).value = pout.label     || '';
+      $(`pd-comm-${n}`).value  = pout.commValue || '';
+      setPayoutCommType(n, pout.commType || 'pct');
+      // Restore days-after; fallback: compute from stored date vs contract date
+      if (pout.daysAfter != null) {
+        $(`pd-days-${n}`).value = pout.daysAfter;
+      } else if (pout.date && p.purchaseDate) {
+        const diff = Math.round((new Date(pout.date + 'T00:00:00') - new Date(p.purchaseDate + 'T00:00:00')) / 86400000);
+        $(`pd-days-${n}`).value = diff >= 0 ? diff : 0;
+      }
+      recalcPayoutDate(n);
     }
   });
   // Referral milestone dates
@@ -6462,9 +6552,12 @@ function resetPreForm() {
   $('pf-occupancy').value = '';
   $('pf-category').value = 'Condo';
   for (let i = 1; i <= 4; i++) {
-    $(`pd-label-${i}`).value = '';
-    $(`pd-date-${i}`).value  = '';
-    $(`pd-comm-${i}`).value  = '';
+    $(`pd-label-${i}`).value   = '';
+    $(`pd-days-${i}`).value    = '';
+    $(`pd-date-${i}`).value    = '';
+    $(`pd-comm-${i}`).value    = '';
+    const disp = $(`pd-date-display-${i}`);
+    if (disp) { disp.textContent = '—'; disp.style.color = 'var(--muted)'; }
     setPayoutCommType(i, 'pct');
   }
   $('pre-tm-list').innerHTML = '';
@@ -6506,11 +6599,40 @@ function toggleReferralSection() {
   chev.textContent = open ? '▲' : '▼';
 }
 
+// Auto-calculate a payout date from contract date + days input
+function recalcPayoutDate(i) {
+  const contractDate = $('pf-purchase-date').value;
+  const daysEl       = $(`pd-days-${i}`);
+  const displayEl    = $(`pd-date-display-${i}`);
+  const hiddenEl     = $(`pd-date-${i}`);
+  const days         = daysEl ? (parseInt(daysEl.value) || 0) : 0;
+
+  if (contractDate && daysEl && daysEl.value !== '') {
+    const d = new Date(contractDate + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const result = d.toISOString().split('T')[0];
+    if (hiddenEl)  hiddenEl.value    = result;
+    if (displayEl) { displayEl.textContent = fmtDate(result); displayEl.style.color = 'var(--primary)'; }
+  } else if (!contractDate) {
+    if (displayEl) { displayEl.textContent = 'Set contract date first'; displayEl.style.color = 'var(--muted)'; }
+    if (hiddenEl)  hiddenEl.value = '';
+  } else {
+    if (displayEl) { displayEl.textContent = '—'; displayEl.style.color = 'var(--muted)'; }
+    if (hiddenEl)  hiddenEl.value = '';
+  }
+  prePreview();
+}
+
+function recalcAllPayoutDates() {
+  for (let i = 1; i <= 4; i++) recalcPayoutDate(i);
+}
+
 // Sync purchase date → ms-sign whenever the purchase date changes
 function syncMsSign() {
   const v = $('pf-purchase-date').value;
   if (v) $('ms-sign').value = v;
   updateRulePreview();
+  recalcAllPayoutDates();
 }
 
 function getMilestoneDate(trigger) {
@@ -6552,12 +6674,21 @@ function calcPayoutDates() {
   let applied = 0;
   for (let i = 1; i <= 4; i++) {
     const trigger = $(`rule-trigger-${i}`)?.value || '';
-    const days    = $(`rule-days-${i}`)?.value || '0';
+    const days    = parseInt($(`rule-days-${i}`)?.value) || 0;
     if (!trigger) continue;
     const base    = getMilestoneDate(trigger);
     if (!base)    continue;
     const result  = addDays(base, days);
-    $(`pd-date-${i}`).value = result;
+    // Write to hidden date field + update display
+    const hiddenEl  = $(`pd-date-${i}`);
+    const displayEl = $(`pd-date-display-${i}`);
+    if (hiddenEl)  hiddenEl.value = result;
+    if (displayEl) { displayEl.textContent = fmtDate(result); displayEl.style.color = 'var(--primary)'; }
+    // If trigger is contract signing, also sync the days input
+    if (trigger === 'sign') {
+      const daysEl = $(`pd-days-${i}`);
+      if (daysEl) daysEl.value = days;
+    }
     applied++;
   }
   if (applied === 0) { toast('No trigger rules set — add triggers first.', 'error'); return; }
@@ -6839,12 +6970,12 @@ async function savePre() {
   const payouts = [];
   for (let i = 1; i <= 4; i++) {
     const label     = $(`pd-label-${i}`).value.trim();
-    const date      = $(`pd-date-${i}`).value;
+    const date      = $(`pd-date-${i}`).value;   // populated by recalcPayoutDate()
     const commValue = parseFloat($(`pd-comm-${i}`).value) || 0;
     const commType  = payoutCommTypes[i] || 'pct';
-    const trigger   = $(`rule-trigger-${i}`)?.value || '';
-    const daysAfter = parseInt($(`rule-days-${i}`)?.value) || 0;
-    if (label || date) payouts.push({ label, date, isPaid: false, commType, commValue, trigger, daysAfter });
+    const daysAfter = parseInt($(`pd-days-${i}`)?.value) || 0;
+    const trigger   = $(`rule-trigger-${i}`)?.value || 'sign'; // advanced override from referral panel
+    if (label || date) payouts.push({ label, date, isPaid: false, commType, commValue, daysAfter, trigger });
   }
 
   const txYear = new Date(purchaseDate + 'T00:00:00').getFullYear();

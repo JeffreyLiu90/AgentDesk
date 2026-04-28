@@ -862,29 +862,6 @@
     .payout-cb { width: 16px; height: 16px; cursor: pointer; accent-color: var(--success); }
     .payout-cb-lbl { font-size: var(--text-xs); font-weight: var(--fw-bold); }
 
-    /* ── Referral Schedule Calculator ── */
-    .referral-panel { border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; margin-top: .2rem; }
-    .referral-header { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1rem; background: var(--bg); cursor: pointer; font-size: .82rem; font-weight: var(--fw-bold); color: var(--navy); user-select: none; }
-    .referral-header:hover { background: var(--border); }
-    .referral-body { padding: 1rem; display: none; border-top: 1px solid var(--border); }
-    .referral-body.open { display: block; }
-    .referral-upload-zone { border: 2px dashed var(--border); border-radius: var(--r-lg); padding: 1.2rem; text-align: center; cursor: pointer; transition: all var(--t-base); color: var(--muted); font-size: .85rem; background: var(--bg); }
-    .referral-upload-zone:hover, .referral-upload-zone.drag-over { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
-    .referral-doc-preview { margin-top: .8rem; }
-    .referral-img-thumb { max-width: 100%; max-height: 200px; border-radius: var(--r-md); border: 1px solid var(--border); }
-    .referral-text-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: .7rem; font-size: .78rem; font-family: monospace; max-height: 140px; overflow-y: auto; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
-    .referral-parsed-tag { display: inline-block; background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); border-radius: var(--r-xs); padding: .15rem .45rem; font-size: .72rem; font-weight: var(--fw-bold); margin: .1rem .15rem; }
-    .ms-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: .7rem; }
-    .rule-row { display: flex; align-items: center; gap: .5rem; padding: .6rem .8rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: .4rem; }
-    .rule-num { width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: white; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: var(--fw-black); flex-shrink: 0; }
-    .rule-select { flex: 1; padding: .32rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); font-size: .8rem; background: var(--white); color: var(--text); }
-    .rule-days-input { width: 68px; padding: .32rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); font-size: .8rem; text-align: center; }
-    .rule-arrow { color: var(--muted); font-size: .85rem; flex-shrink: 0; }
-    .rule-result-date { font-size: .8rem; font-weight: var(--fw-semi); color: var(--primary); min-width: 90px; }
-    .calc-dates-btn { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; padding: .55rem 1.2rem; background: var(--navy); color: white; border: none; border-radius: var(--r-md); font-size: .83rem; font-weight: var(--fw-bold); cursor: pointer; transition: all var(--t-base); }
-    .calc-dates-btn:hover { background: var(--primary); }
-    .referral-section-lbl { font-size: .75rem; font-weight: var(--fw-black); text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: .9rem 0 .4rem; }
-
     /* Category pill */
     .cat-pill {
       display: inline-block; padding: 0.15rem 0.55rem;
@@ -3823,121 +3800,6 @@
         </div>
       </div>
 
-      <!-- Referral Agreement & Auto-Schedule Calculator -->
-      <div class="referral-panel" id="referral-panel">
-        <div class="referral-header" onclick="toggleReferralSection()">
-          <span>📎 Referral Agreement & Auto-Schedule Calculator</span>
-          <span id="referral-chevron">▼</span>
-        </div>
-        <div class="referral-body" id="referral-body">
-
-          <!-- Upload zone -->
-          <div class="referral-upload-zone" id="referral-dropzone"
-               onclick="$('referral-file-input').click()"
-               ondragover="event.preventDefault();this.classList.add('drag-over')"
-               ondragleave="this.classList.remove('drag-over')"
-               ondrop="handleReferralDrop(event)">
-            <div style="font-size:1.5rem;margin-bottom:.3rem">📄</div>
-            <strong>Upload Broker Referral Doc or APS Front Page</strong><br>
-            <span style="font-size:.78rem">PDF or image (JPG/PNG) · drag & drop or click to browse</span>
-            <input type="file" id="referral-file-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none" onchange="handleReferralFile(this.files[0])" />
-          </div>
-          <div id="referral-doc-preview"></div>
-
-          <!-- Milestone dates -->
-          <div class="referral-section-lbl">📅 Deal Milestone Dates</div>
-          <div class="pf-info-box" style="margin-bottom:.5rem">Enter the actual or expected dates for each milestone. Contract signing auto-fills from Purchase Date above.</div>
-          <div class="ms-grid">
-            <div class="fg" style="margin-bottom:0"><label>Contract Signing</label><input type="date" id="ms-sign" onchange="updateRulePreview()" /></div>
-            <div class="fg" style="margin-bottom:0"><label>1st Deposit</label><input type="date" id="ms-dep1" onchange="updateRulePreview()" /></div>
-            <div class="fg" style="margin-bottom:0"><label>2nd Deposit</label><input type="date" id="ms-dep2" onchange="updateRulePreview()" /></div>
-            <div class="fg" style="margin-bottom:0"><label>3rd Deposit</label><input type="date" id="ms-dep3" onchange="updateRulePreview()" /></div>
-            <div class="fg" style="margin-bottom:0"><label>4th Deposit</label><input type="date" id="ms-dep4" onchange="updateRulePreview()" /></div>
-            <div class="fg" style="margin-bottom:0"><label>Final Closing</label><input type="date" id="ms-closing" onchange="updateRulePreview()" /></div>
-          </div>
-          <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Occupancy date uses the field above ↑</div>
-
-          <!-- Payment trigger rules -->
-          <div class="referral-section-lbl">⚙️ Payment Trigger Rules</div>
-          <div class="pf-info-box" style="margin-bottom:.5rem">Define what event triggers each payout and how many days after. Click <strong>Calculate</strong> to auto-fill the payout dates above.</div>
-          <div id="rule-builder-rows">
-            <div class="rule-row">
-              <div class="rule-num">1</div>
-              <select class="rule-select" id="rule-trigger-1" onchange="updateRulePreview()">
-                <option value="">— Select trigger —</option>
-                <option value="sign">Contract Signing</option>
-                <option value="dep1">1st Deposit Cleared</option>
-                <option value="dep2">2nd Deposit Cleared</option>
-                <option value="dep3">3rd Deposit Cleared</option>
-                <option value="dep4">4th Deposit Cleared</option>
-                <option value="occupancy">Occupancy Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span style="font-size:.78rem;color:var(--muted);flex-shrink:0">+</span>
-              <input type="number" class="rule-days-input" id="rule-days-1" placeholder="0" min="0" value="0" onchange="updateRulePreview()" />
-              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
-              <span class="rule-arrow">→</span>
-              <span class="rule-result-date" id="rule-result-1">—</span>
-            </div>
-            <div class="rule-row">
-              <div class="rule-num">2</div>
-              <select class="rule-select" id="rule-trigger-2" onchange="updateRulePreview()">
-                <option value="">— Select trigger —</option>
-                <option value="sign">Contract Signing</option>
-                <option value="dep1">1st Deposit Cleared</option>
-                <option value="dep2">2nd Deposit Cleared</option>
-                <option value="dep3">3rd Deposit Cleared</option>
-                <option value="dep4">4th Deposit Cleared</option>
-                <option value="occupancy">Occupancy Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span style="font-size:.78rem;color:var(--muted);flex-shrink:0">+</span>
-              <input type="number" class="rule-days-input" id="rule-days-2" placeholder="0" min="0" value="0" onchange="updateRulePreview()" />
-              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
-              <span class="rule-arrow">→</span>
-              <span class="rule-result-date" id="rule-result-2">—</span>
-            </div>
-            <div class="rule-row">
-              <div class="rule-num">3</div>
-              <select class="rule-select" id="rule-trigger-3" onchange="updateRulePreview()">
-                <option value="">— Select trigger —</option>
-                <option value="sign">Contract Signing</option>
-                <option value="dep1">1st Deposit Cleared</option>
-                <option value="dep2">2nd Deposit Cleared</option>
-                <option value="dep3">3rd Deposit Cleared</option>
-                <option value="dep4">4th Deposit Cleared</option>
-                <option value="occupancy">Occupancy Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span style="font-size:.78rem;color:var(--muted);flex-shrink:0">+</span>
-              <input type="number" class="rule-days-input" id="rule-days-3" placeholder="0" min="0" value="0" onchange="updateRulePreview()" />
-              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
-              <span class="rule-arrow">→</span>
-              <span class="rule-result-date" id="rule-result-3">—</span>
-            </div>
-            <div class="rule-row">
-              <div class="rule-num">4</div>
-              <select class="rule-select" id="rule-trigger-4" onchange="updateRulePreview()">
-                <option value="">— Select trigger —</option>
-                <option value="sign">Contract Signing</option>
-                <option value="dep1">1st Deposit Cleared</option>
-                <option value="dep2">2nd Deposit Cleared</option>
-                <option value="dep3">3rd Deposit Cleared</option>
-                <option value="dep4">4th Deposit Cleared</option>
-                <option value="occupancy">Occupancy Date</option>
-                <option value="closing">Final Closing</option>
-              </select>
-              <span style="font-size:.78rem;color:var(--muted);flex-shrink:0">+</span>
-              <input type="number" class="rule-days-input" id="rule-days-4" placeholder="0" min="0" value="0" onchange="updateRulePreview()" />
-              <span style="font-size:.75rem;color:var(--muted);flex-shrink:0">days</span>
-              <span class="rule-arrow">→</span>
-              <span class="rule-result-date" id="rule-result-4">—</span>
-            </div>
-          </div>
-          <button class="calc-dates-btn" onclick="calcPayoutDates()">🔄 Apply Calculated Dates to Payout Schedule</button>
-        </div>
-      </div>
-
       <div class="sec-divider">📋 Commission Preview</div>
       <div class="preview-box" id="pre-comm-preview"><div class="preview-empty">Fill in the details above to see your commission breakdown</div></div>
     </div>
@@ -6501,33 +6363,6 @@ function editPreTx(id) {
       recalcPayoutDate(n);
     }
   });
-  // Referral milestone dates
-  if (p.milestones) {
-    const ms = p.milestones;
-    ['sign','dep1','dep2','dep3','dep4','closing'].forEach(key => {
-      const el = $(`ms-${key}`);
-      if (el && ms[key]) el.value = ms[key];
-    });
-  }
-  // Trigger rules (stored on each payout)
-  p.payouts.forEach((pout, i) => {
-    if (i < 4 && pout.trigger) {
-      const sel  = $(`rule-trigger-${i+1}`);
-      const days = $(`rule-days-${i+1}`);
-      if (sel)  sel.value  = pout.trigger;
-      if (days) days.value = pout.daysAfter != null ? pout.daysAfter : '0';
-    }
-  });
-  if (p.milestones || p.payouts.some(po => po.trigger)) {
-    // Open referral panel and refresh preview
-    const body = $('referral-body');
-    if (body && !body.classList.contains('open')) {
-      body.classList.add('open');
-      const chev = $('referral-chevron');
-      if (chev) chev.textContent = '▲';
-    }
-    updateRulePreview();
-  }
   // Team members
   $('pre-tm-list').innerHTML = '';
   preMemberCount = 0;
@@ -6564,7 +6399,6 @@ function resetPreForm() {
   preMemberCount = 0;
   addPreMember(true);
   $('pre-comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
-  resetReferralSection();
 }
 
 function addPreMember(isFirst = false) {
@@ -6591,13 +6425,6 @@ function setPayoutCommType(n, t) {
 }
 
 /* ─── REFERRAL SCHEDULE CALCULATOR ─── */
-
-function toggleReferralSection() {
-  const body = $('referral-body');
-  const chev = $('referral-chevron');
-  const open = body.classList.toggle('open');
-  chev.textContent = open ? '▲' : '▼';
-}
 
 // Auto-calculate a payout date from contract date + days input
 function recalcPayoutDate(i) {
@@ -6627,238 +6454,9 @@ function recalcAllPayoutDates() {
   for (let i = 1; i <= 4; i++) recalcPayoutDate(i);
 }
 
-// Sync purchase date → ms-sign whenever the purchase date changes
+// Sync contract date → recalculate all payout dates
 function syncMsSign() {
-  const v = $('pf-purchase-date').value;
-  if (v) $('ms-sign').value = v;
-  updateRulePreview();
   recalcAllPayoutDates();
-}
-
-function getMilestoneDate(trigger) {
-  const map = {
-    sign:      $('ms-sign')?.value     || $('pf-purchase-date')?.value,
-    dep1:      $('ms-dep1')?.value,
-    dep2:      $('ms-dep2')?.value,
-    dep3:      $('ms-dep3')?.value,
-    dep4:      $('ms-dep4')?.value,
-    occupancy: $('pf-occupancy')?.value,
-    closing:   $('ms-closing')?.value
-  };
-  return map[trigger] || '';
-}
-
-function addDays(dateStr, days) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + (parseInt(days) || 0));
-  return d.toISOString().split('T')[0];
-}
-
-function updateRulePreview() {
-  for (let i = 1; i <= 4; i++) {
-    const trigger = $(`rule-trigger-${i}`)?.value || '';
-    const days    = $(`rule-days-${i}`)?.value || '0';
-    const el      = $(`rule-result-${i}`);
-    if (!el) continue;
-    if (!trigger) { el.textContent = '—'; el.style.color = 'var(--muted)'; continue; }
-    const base    = getMilestoneDate(trigger);
-    if (!base)    { el.textContent = 'date missing'; el.style.color = 'var(--warning)'; continue; }
-    const result  = addDays(base, days);
-    el.textContent = fmtDate(result);
-    el.style.color = 'var(--primary)';
-  }
-}
-
-function calcPayoutDates() {
-  let applied = 0;
-  for (let i = 1; i <= 4; i++) {
-    const trigger = $(`rule-trigger-${i}`)?.value || '';
-    const days    = parseInt($(`rule-days-${i}`)?.value) || 0;
-    if (!trigger) continue;
-    const base    = getMilestoneDate(trigger);
-    if (!base)    continue;
-    const result  = addDays(base, days);
-    // Write to hidden date field + update display
-    const hiddenEl  = $(`pd-date-${i}`);
-    const displayEl = $(`pd-date-display-${i}`);
-    if (hiddenEl)  hiddenEl.value = result;
-    if (displayEl) { displayEl.textContent = fmtDate(result); displayEl.style.color = 'var(--primary)'; }
-    // If trigger is contract signing, also sync the days input
-    if (trigger === 'sign') {
-      const daysEl = $(`pd-days-${i}`);
-      if (daysEl) daysEl.value = days;
-    }
-    applied++;
-  }
-  if (applied === 0) { toast('No trigger rules set — add triggers first.', 'error'); return; }
-  prePreview();
-  toast(`✓ ${applied} payout date${applied > 1 ? 's' : ''} calculated!`, 'success');
-}
-
-/* ─── DOCUMENT UPLOAD ─── */
-
-async function loadPdfJs() {
-  if (window.pdfjsLib) return true;
-  return new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    s.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      resolve(true);
-    };
-    s.onerror = () => resolve(false);
-    document.head.appendChild(s);
-  });
-}
-
-function handleReferralDrop(e) {
-  e.preventDefault();
-  $('referral-dropzone').classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) handleReferralFile(file);
-}
-
-async function handleReferralFile(file) {
-  if (!file) return;
-  const preview = $('referral-doc-preview');
-  preview.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:.5rem 0">Processing…</div>';
-
-  if (file.type.startsWith('image/')) {
-    // Show image thumbnail
-    const url = URL.createObjectURL(file);
-    preview.innerHTML = `
-      <div style="margin-top:.6rem">
-        <img src="${url}" class="referral-img-thumb" alt="Uploaded document" />
-        <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">📎 ${escHtml(file.name)} — review the document above and enter the schedule rules manually below.</div>
-      </div>`;
-    return;
-  }
-
-  if (file.type === 'application/pdf') {
-    const loaded = await loadPdfJs();
-    if (!loaded) {
-      preview.innerHTML = `<div style="color:var(--warning);font-size:.82rem;padding:.5rem 0">⚠ Could not load PDF reader. Please enter the schedule manually.</div>`;
-      return;
-    }
-    try {
-      const buf  = await file.arrayBuffer();
-      const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
-      const pages = Math.min(pdf.numPages, 3); // read first 3 pages
-      let fullText = '';
-      for (let pg = 1; pg <= pages; pg++) {
-        const page    = await pdf.getPage(pg);
-        const content = await page.getTextContent();
-        fullText += content.items.map(i => i.str).join(' ') + '\n';
-      }
-      renderReferralText(fullText, file.name);
-    } catch (err) {
-      preview.innerHTML = `<div style="color:var(--danger);font-size:.82rem;padding:.5rem 0">⚠ Error reading PDF: ${escHtml(err.message)}</div>`;
-    }
-    return;
-  }
-
-  preview.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:.5rem 0">Unsupported file type. Please upload a PDF or image.</div>`;
-}
-
-function renderReferralText(text, filename) {
-  const parsed = parseReferralSchedule(text);
-  const tagsHTML = parsed.length
-    ? parsed.map(r => `<span class="referral-parsed-tag">${escHtml(r.label)}</span>`).join('')
-    : '<span style="color:var(--muted);font-size:.8rem">No schedule patterns detected — enter rules manually below.</span>';
-
-  $('referral-doc-preview').innerHTML = `
-    <div style="margin-top:.7rem">
-      <div style="font-size:.75rem;font-weight:700;margin-bottom:.3rem;color:var(--navy)">📎 ${escHtml(filename)}</div>
-      <div style="font-size:.75rem;color:var(--muted);margin-bottom:.4rem">Detected payment triggers: ${tagsHTML}</div>
-      <details style="margin-top:.4rem">
-        <summary style="font-size:.75rem;cursor:pointer;color:var(--primary);font-weight:600">View extracted text ▾</summary>
-        <div class="referral-text-box" style="margin-top:.4rem">${escHtml(text.slice(0, 3000))}${text.length > 3000 ? '\n… (truncated)' : ''}</div>
-      </details>
-    </div>`;
-
-  // Auto-populate rule rows from parsed results
-  if (parsed.length) {
-    parsed.forEach((r, i) => {
-      if (i >= 4) return;
-      const sel = $(`rule-trigger-${i + 1}`);
-      const daysEl = $(`rule-days-${i + 1}`);
-      if (sel && r.trigger)   sel.value = r.trigger;
-      if (daysEl && r.days != null) daysEl.value = r.days;
-    });
-    updateRulePreview();
-    toast(`✓ ${parsed.length} payment rule${parsed.length > 1 ? 's' : ''} detected from document`, 'success');
-  }
-}
-
-function parseReferralSchedule(text) {
-  const t = text.toLowerCase().replace(/\s+/g, ' ');
-  const results = [];
-
-  // Patterns: "[N] days [after/following/of/from] [trigger]"
-  const triggerMap = [
-    { keys: ['firm', 'signing', 'signed', 'execution', 'contract'],  trigger: 'sign',      label: 'Contract Signing' },
-    { keys: ['first deposit', '1st deposit', 'initial deposit'],     trigger: 'dep1',      label: '1st Deposit' },
-    { keys: ['second deposit', '2nd deposit'],                       trigger: 'dep2',      label: '2nd Deposit' },
-    { keys: ['third deposit', '3rd deposit'],                        trigger: 'dep3',      label: '3rd Deposit' },
-    { keys: ['fourth deposit', '4th deposit', 'final deposit'],      trigger: 'dep4',      label: '4th Deposit' },
-    { keys: ['interim occupancy', 'occupancy', 'occupation'],        trigger: 'occupancy', label: 'Occupancy' },
-    { keys: ['final closing', 'key release', 'closing'],             trigger: 'closing',   label: 'Final Closing' }
-  ];
-
-  // Try to find "[N] days [after/following/from/of] [trigger]"
-  const dayPattern = /(\d+)\s*(?:business\s+)?days?\s+(?:after|following|from|of|upon)\s+(.{3,60}?)(?:[,;.]|$|\n)/gi;
-  let match;
-  while ((match = dayPattern.exec(t)) !== null) {
-    const days = parseInt(match[1]);
-    const ctx  = match[2];
-    for (const tm of triggerMap) {
-      if (tm.keys.some(k => ctx.includes(k))) {
-        if (!results.find(r => r.trigger === tm.trigger)) {
-          results.push({ trigger: tm.trigger, days, label: `${days}d after ${tm.label}` });
-        }
-        break;
-      }
-    }
-  }
-
-  // Also look for "upon [trigger]" with 0 days
-  const uponPattern = /(?:payable\s+)?upon\s+(.{3,60}?)(?:[,;.]|$|\n)/gi;
-  while ((match = uponPattern.exec(t)) !== null) {
-    const ctx = match[1];
-    for (const tm of triggerMap) {
-      if (tm.keys.some(k => ctx.includes(k))) {
-        if (!results.find(r => r.trigger === tm.trigger)) {
-          results.push({ trigger: tm.trigger, days: 0, label: `Upon ${tm.label}` });
-        }
-        break;
-      }
-    }
-  }
-
-  // Sort by trigger order
-  const order = ['sign','dep1','dep2','dep3','dep4','occupancy','closing'];
-  results.sort((a,b) => order.indexOf(a.trigger) - order.indexOf(b.trigger));
-  return results.slice(0, 4);
-}
-
-function resetReferralSection() {
-  ['ms-sign','ms-dep1','ms-dep2','ms-dep3','ms-dep4','ms-closing'].forEach(id => {
-    const el = $(id); if (el) el.value = '';
-  });
-  for (let i = 1; i <= 4; i++) {
-    const sel = $(`rule-trigger-${i}`); if (sel) sel.value = '';
-    const days = $(`rule-days-${i}`);  if (days) days.value = '0';
-    const res = $(`rule-result-${i}`);  if (res)  { res.textContent = '—'; res.style.color = 'var(--muted)'; }
-  }
-  const preview = $('referral-doc-preview');
-  if (preview) preview.innerHTML = '';
-  const fileIn = $('referral-file-input');
-  if (fileIn) fileIn.value = '';
-  // collapse panel
-  $('referral-body')?.classList.remove('open');
-  if ($('referral-chevron')) $('referral-chevron').textContent = '▼';
 }
 
 // Returns the commission amount for a single payout.
@@ -6960,13 +6558,6 @@ async function savePre() {
     pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
   })).filter(m => m.name && m.pct > 0);
 
-  // Capture milestone dates from referral panel
-  const milestones = {};
-  ['sign','dep1','dep2','dep3','dep4','closing'].forEach(key => {
-    const el = $(`ms-${key}`);
-    if (el?.value) milestones[key] = el.value;
-  });
-
   const payouts = [];
   for (let i = 1; i <= 4; i++) {
     const label     = $(`pd-label-${i}`).value.trim();
@@ -6974,8 +6565,7 @@ async function savePre() {
     const commValue = parseFloat($(`pd-comm-${i}`).value) || 0;
     const commType  = payoutCommTypes[i] || 'pct';
     const daysAfter = parseInt($(`pd-days-${i}`)?.value) || 0;
-    const trigger   = $(`rule-trigger-${i}`)?.value || 'sign'; // advanced override from referral panel
-    if (label || date) payouts.push({ label, date, isPaid: false, commType, commValue, daysAfter, trigger });
+    if (label || date) payouts.push({ label, date, isPaid: false, commType, commValue, daysAfter });
   }
 
   const txYear = new Date(purchaseDate + 'T00:00:00').getFullYear();
@@ -6994,7 +6584,7 @@ async function savePre() {
       ...preTxs[idx],
       projectName, clientName, purchasePrice, purchaseDate,
       category, occupancyDate, commBasis, commRate, kickback, brokSplit,
-      teamMembers, payouts: mergedPayouts, milestones, year: txYear
+      teamMembers, payouts: mergedPayouts, year: txYear
     };
     setLoading('btn-save-pre', true);
     if (isConfigured) {
@@ -7018,7 +6608,7 @@ async function savePre() {
   const newPre = {
     id: uid(), projectName, clientName, purchasePrice, purchaseDate,
     category, occupancyDate, commBasis, commRate, kickback, brokSplit,
-    teamMembers, payouts, milestones, year: txYear
+    teamMembers, payouts, year: txYear
   };
 
   setLoading('btn-save-pre', true);

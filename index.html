@@ -6191,7 +6191,7 @@ function renderPreList() {
 }
 
 function preCardHTML(p) {
-  const { gross, afterKick, agent } = calcPreComm(p);
+  const { gross, afterKick, agent, kickAmt } = calcPreComm(p);
   const teamPctTotal = p.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
   const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -6268,7 +6268,7 @@ function preCardHTML(p) {
       <div class="breakdown-box">
         <div class="breakdown-title">Commission Breakdown</div>
         <div class="bd-row"><span>Gross Commission (${p.commRate}% of ${fmt(p.commBasis)})</span><span>${fmt(gross)}</span></div>
-        ${p.kickback > 0 ? `<div class="bd-row"><span>Kickback Deduction</span><span class="neg">−${fmt(p.kickback)}</span></div>` : ''}
+        ${kickAmt > 0 ? `<div class="bd-row"><span>Kickback${p.kickType === 'pct' ? ` (${p.kickback}% of gross)` : p.kickType === 'pct_price' ? ` (${p.kickback}% of price)` : ' (flat)'}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
         ${teamPctTotal > 0
           ? `<div class="bd-row"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>

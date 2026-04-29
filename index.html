@@ -3889,8 +3889,18 @@ function initTotalComm() {
 function renderTcYearTabs() {
   const years = new Set([new Date().getFullYear()]);
   transactions.forEach(t => years.add(t.year));
-  preTxs.forEach(p => years.add(p.year));
   leaseTxs.forEach(l => years.add(l.year));
+  // For precon, use actual payout date years (not signing year) so future-year payouts auto-create tabs
+  preTxs.forEach(p => {
+    const dated = (p.payouts || []).filter(x => x.date);
+    if (dated.length > 0) {
+      dated.forEach(po => years.add(new Date(po.date + 'T00:00:00').getFullYear()));
+    } else if (p.occupancyDate) {
+      years.add(new Date(p.occupancyDate + 'T00:00:00').getFullYear());
+    } else {
+      years.add(p.year);
+    }
+  });
   const sorted = [...years].sort((a,b) => b-a);
   $('tc-year-tabs').innerHTML = sorted.map(y =>
     `<button class="year-tab ${y===tcYear?'active':''}" onclick="tcPickYear(${y})">${y}</button>`
@@ -3946,30 +3956,42 @@ function renderTotalComm() {
     });
   });
 
-  // ── PRECONSTRUCTION (per payout segment) ──
-  preTxs.filter(p => p.year === yr).forEach(p => {
-    const { userNet } = calcPreComm(p);
-    const payouts    = p.payouts || [];
-    const validCount = payouts.filter(x => x.date).length || 1;
-    const totalPct   = payouts.filter(x => x.commType === 'pct').reduce((s,x) => s + (x.commValue || 0), 0);
-    if (payouts.length === 0) {
-      // no segments — treat whole amount
+  // ── PRECONSTRUCTION (per payout segment, bucketed by payout date year) ──
+  // We iterate ALL precon projects (not filtered by signing year) and show only the
+  // payouts whose date falls in the currently selected year. This means a 2024 contract
+  // with a 2027 payout correctly appears under 2027.
+  preTxs.forEach(p => {
+    const { userNet }  = calcPreComm(p);
+    const payouts      = p.payouts || [];
+    const datedPayouts = payouts.filter(x => x.date);
+    // validCount + totalPct use ALL dated payouts so proportional math stays correct
+    const validCount   = datedPayouts.length || 1;
+    const totalPct     = datedPayouts.filter(x => x.commType === 'pct').reduce((s,x) => s + (x.commValue || 0), 0);
+
+    if (payouts.length === 0 || datedPayouts.length === 0) {
+      // No payout schedule — attribute to occupancy date year (or signing year)
+      const occYear = p.occupancyDate
+        ? new Date(p.occupancyDate + 'T00:00:00').getFullYear()
+        : p.year;
+      if (occYear !== yr) return;
       const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
       if (tcMode === 'realized' && !realized) return;
       if (tcMode === 'expected' && realized)  return;
       items.push({ type:'precon', label: p.projectName || 'Precon Deal',
         address: p.clientName, amount: userNet, date: p.occupancyDate, status: realized ? 'paid' : 'future' });
     } else {
-      payouts.forEach(po => {
-        if (!po.date) return;
-        const poDate = new Date(po.date + 'T00:00:00');
-        const realized = po.isPaid || poDate <= today;
-        if (tcMode === 'realized' && !realized) return;
-        if (tcMode === 'expected' && realized)  return;
-        items.push({ type:'precon', label: `${p.projectName} — ${po.label || 'Payout'}`,
-          address: p.clientName, amount: payoutAmt(po, userNet, validCount, totalPct), date: po.date,
-          status: po.isPaid ? 'paid' : (poDate <= today ? 'pending' : 'future') });
-      });
+      // Only include payouts whose date falls in the selected year
+      datedPayouts
+        .filter(po => new Date(po.date + 'T00:00:00').getFullYear() === yr)
+        .forEach(po => {
+          const poDate   = new Date(po.date + 'T00:00:00');
+          const realized = po.isPaid || poDate <= today;
+          if (tcMode === 'realized' && !realized) return;
+          if (tcMode === 'expected' && realized)  return;
+          items.push({ type:'precon', label: `${p.projectName} — ${po.label || 'Payout'}`,
+            address: p.clientName, amount: payoutAmt(po, userNet, validCount, totalPct), date: po.date,
+            status: po.isPaid ? 'paid' : (poDate <= today ? 'pending' : 'future') });
+        });
     }
   });
 

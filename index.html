@@ -718,6 +718,10 @@
     .tx-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--r-xl); margin-bottom: 0.9rem; overflow: hidden; transition: box-shadow var(--t-base), border-color var(--t-base); }
     .tx-card:hover { box-shadow: var(--shadow); border-color: var(--navy-subtle2); }
     .tx-card.overdue { border-color: var(--danger-border); background: linear-gradient(135deg, var(--white) 85%, var(--danger-bg)); }
+    .tx-card.draft-card { border-style: dashed; border-color: #D97706; background: linear-gradient(135deg, var(--white) 90%, #FFFBEB); opacity: .92; }
+    .draft-badge { display:inline-flex;align-items:center;gap:.25rem;background:#FEF3C7;color:#92400E;font-size:.65rem;font-weight:800;padding:.18rem .5rem;border-radius:2rem;letter-spacing:.05em;text-transform:uppercase;border:1px solid #FCD34D; }
+    .draft-section-hdr { font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#92400E;padding:.4rem .2rem .2rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem }
+    .draft-section-hdr::after { content:'';flex:1;height:1px;background:#FCD34D }
     .tx-card-bar { height: 3px; width: 100%; }
 
     .tx-row { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-3) var(--sp-5); cursor: pointer; gap: 1rem; }
@@ -3575,6 +3579,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeAddTx()">Cancel</button>
+      <button class="btn-save" id="btn-draft-tx" onclick="saveTxDraft()" style="background:transparent;color:#92400E;border:1.5px solid #FCD34D;box-shadow:none">💾 Save as Draft</button>
       <button class="btn-save" id="btn-save-tx" onclick="saveTx()">Add Transaction</button>
     </div>
   </div>
@@ -3694,6 +3699,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeAddLease()">Cancel</button>
+      <button class="btn-save" id="btn-draft-lease" onclick="saveLeaseDraft()" style="background:transparent;color:#92400E;border:1.5px solid #FCD34D;box-shadow:none">💾 Save as Draft</button>
       <button class="btn-save" id="btn-save-lease" onclick="saveLease()" style="background:linear-gradient(135deg,#065F46,#059669)">Add Transaction</button>
     </div>
   </div>
@@ -3774,6 +3780,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeAddPre()">Cancel</button>
+      <button class="btn-save" id="btn-draft-pre" onclick="savePreDraft()" style="background:transparent;color:#92400E;border:1.5px solid #FCD34D;box-shadow:none">💾 Save as Draft</button>
       <button class="btn-save" id="btn-save-pre" onclick="savePre()">Add Transaction</button>
     </div>
   </div>
@@ -3836,8 +3843,7 @@ function calcComm(t) {
                      : (t.kickback || 0);
   const afterKick    = Math.max(0, gross - kickAmt);
   const agent        = afterKick * ((t.brokSplit || 100) / 100);
-  const teamPct      = (t.teamMembers || []).reduce((s,m) => s + m.pct, 0);
-  const userNet      = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  const { userNet } = calcMemberSplits(t.teamMembers || [], agent);
   return { gross, afterKick, agent, userNet, kickAmt };
 }
 
@@ -5507,6 +5513,90 @@ function getSeedData() {
   ];
 }
 
+/* ════════════════════════════════════════════
+   DRAFT SYSTEM  (localStorage, all users)
+════════════════════════════════════════════ */
+const DRAFT_KEY_RESALE = 'agentdesk_drafts_resale';
+const DRAFT_KEY_LEASE  = 'agentdesk_drafts_lease';
+const DRAFT_KEY_PRE    = 'agentdesk_drafts_pre';
+
+let resaleDrafts = [];
+let leaseDrafts  = [];
+let preDrafts    = [];
+
+let editingDraftResaleId = null;
+let editingDraftLeaseId  = null;
+let editingDraftPreId    = null;
+
+function loadResaleDrafts() { resaleDrafts = JSON.parse(localStorage.getItem(DRAFT_KEY_RESALE) || '[]'); }
+function saveResaleDraftStorage() { localStorage.setItem(DRAFT_KEY_RESALE, JSON.stringify(resaleDrafts)); }
+function loadLeaseDrafts()  { leaseDrafts  = JSON.parse(localStorage.getItem(DRAFT_KEY_LEASE)  || '[]'); }
+function saveLeaseDraftStorage()  { localStorage.setItem(DRAFT_KEY_LEASE,  JSON.stringify(leaseDrafts));  }
+function loadPreDrafts()    { preDrafts    = JSON.parse(localStorage.getItem(DRAFT_KEY_PRE)    || '[]'); }
+function savePreDraftStorage()    { localStorage.setItem(DRAFT_KEY_PRE,    JSON.stringify(preDrafts));    }
+
+function deleteDraft(type, id) {
+  if (type === 'resale') { resaleDrafts = resaleDrafts.filter(d => d.id !== id); saveResaleDraftStorage(); renderTxList(); }
+  if (type === 'lease')  { leaseDrafts  = leaseDrafts.filter(d => d.id !== id);  saveLeaseDraftStorage();  renderLeaseList(); }
+  if (type === 'pre')    { preDrafts    = preDrafts.filter(d => d.id !== id);    savePreDraftStorage();    renderPreList(); }
+}
+
+function draftCardHTML(d, type) {
+  const label  = type === 'resale' ? (d.address || d.clientName || 'Untitled Draft')
+               : type === 'lease'  ? (d.address  || d.clientName || 'Untitled Draft')
+               : (d.projectName || d.clientName || 'Untitled Draft');
+  const sub    = type === 'resale' ? (d.clientName ? `${d.clientName}${d.closingDate ? ' · Closing ' + fmtDate(d.closingDate) : ''}` : '—')
+               : type === 'lease'  ? (d.clientName ? `${d.clientName}${d.startDate ? ' · Starts ' + fmtDate(d.startDate) : ''}` : '—')
+               : (d.clientName    ? `${d.clientName}${d.purchaseDate ? ' · ' + fmtDate(d.purchaseDate) : ''}` : '—');
+  const editFn = type === 'resale' ? `editDraftResale('${d.id}')` : type === 'lease' ? `editDraftLease('${d.id}')` : `editDraftPre('${d.id}')`;
+  return `
+  <div class="tx-card draft-card" id="draft-${type}-${d.id}">
+    <div class="tx-card-bar" style="background:#F59E0B"></div>
+    <div class="tx-row" style="cursor:default">
+      <div class="tx-left">
+        <div class="tx-badge" style="background:#FEF3C7;font-size:1.1rem">📝</div>
+        <div>
+          <div class="tx-address">${label} <span class="draft-badge">✏ Draft</span></div>
+          <div class="tx-meta">${sub}</div>
+        </div>
+      </div>
+      <div class="tx-right">
+        <div class="tx-amount"><div class="tx-amount-val" style="color:var(--muted)">Incomplete</div><div class="tx-amount-lbl">fill in details</div></div>
+        <button class="edit-btn" onclick="${editFn}" title="Complete Draft">✏️</button>
+        <button class="del-btn" onclick="deleteDraft('${type}','${d.id}')" title="Delete Draft">🗑</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ─── Team-split helper (% or flat $) ────────────────────────────── */
+function calcMemberSplits(teamMembers, agent) {
+  let dollarTotal = 0, pctTotal = 0;
+  (teamMembers || []).forEach(m => {
+    if (m.splitType === 'dollar') dollarTotal += (m.pct || 0);
+    else                          pctTotal    += (m.pct || 0);
+  });
+  const userNet = Math.max(0, agent - dollarTotal - agent * (pctTotal / 100));
+  const hasAny  = (teamMembers || []).some(m => m.pct > 0);
+  return { dollarTotal, pctTotal, userNet, hasAny };
+}
+
+function setMemberSplitType(rowId, type, previewFn) {
+  const row = $(rowId);
+  if (!row) return;
+  row.dataset.splitType = type;
+  row.querySelector('[id$="-st-pct"]')?.classList.toggle('active', type === 'pct');
+  row.querySelector('[id$="-st-dlr"]')?.classList.toggle('active', type === 'dollar');
+  const lbl = row.querySelector('.tm-split-label');
+  if (lbl) lbl.textContent = type === 'pct' ? 'Split (%)' : 'Split ($)';
+  const inp = row.querySelector('[id$="-pct"]');
+  if (inp) inp.placeholder = type === 'pct' ? '50' : '5000';
+  if (previewFn === 'previewUpdate') previewUpdate();
+  else if (previewFn === 'leasePreview') leasePreview();
+  else if (previewFn === 'prePreview')  prePreview();
+}
+/* ─────────────────────────────────────────────────────────────────── */
+
 function saveDemoTxs() {
   if (!isConfigured) localStorage.setItem('agentdesk_demo_txs', JSON.stringify(transactions));
 }
@@ -5540,6 +5630,7 @@ function showView(v, subType) {
    RESALE VIEW
 ════════════════════════════════════════════ */
 function initResale() {
+  loadResaleDrafts();
   renderYearTabs();
   renderSummary();
   renderChart();
@@ -5615,18 +5706,20 @@ function renderTxList() {
   const list = [...filtered()].sort((a,b) => new Date(b.closingDate)-new Date(a.closingDate));
   const el   = $('tx-list');
   $('tx-count').textContent = `${list.length} transaction${list.length!==1?'s':''}`;
-
+  const draftsHTML = resaleDrafts.length
+    ? `<div class="draft-section-hdr">✏ Drafts (${resaleDrafts.length})</div>${resaleDrafts.map(d => draftCardHTML(d,'resale')).join('')}`
+    : '';
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><h3>No transactions yet</h3><p>Click "Add Transaction" to record your first resale commission for ${selectedYear}.</p></div>`;
+    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">📋</div><h3>No transactions yet</h3><p>Click "Add Transaction" to record your first resale commission for ${selectedYear}.</p></div>`;
     return;
   }
-  el.innerHTML = list.map(txCardHTML).join('');
+  el.innerHTML = draftsHTML + list.map(txCardHTML).join('');
 }
 
 function txCardHTML(t) {
-  const {gross, afterKick, agent, kickAmt} = calcComm(t);
-  const teamPctTotal = t.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const {gross, afterKick, agent, kickAmt, userNet} = calcComm(t);
+  const { hasAny: hasTeam } = calcMemberSplits(t.teamMembers || [], agent);
+  const teamDeducted = agent - userNet;
   const due      = paymentDue(t.closingDate);
   const today    = new Date(); today.setHours(0,0,0,0);
   const isOverdue = !t.isPaid && due < today;
@@ -5637,13 +5730,17 @@ function txCardHTML(t) {
   const pspText   = t.isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending';
 
   const teamHTML = t.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${t.teamMembers.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${t.teamMembers.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
-  const breakdownTotal = teamPctTotal > 0
+  const breakdownTotal = hasTeam
     ? `<div class="bd-row"><span>Brokerage (you keep ${t.brokSplit}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
        <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
     : `<div class="bd-row sep"><span>Brokerage (you keep ${t.brokSplit}%)</span><span class="neg">−${fmt(afterKick-agent)}</span></div>
        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
@@ -5740,7 +5837,7 @@ function openAddTx() {
   $('add-tx-overlay').classList.remove('hidden');
   resetForm();
 }
-function closeAddTx() { $('add-tx-overlay').classList.add('hidden'); editingTxId = null; }
+function closeAddTx() { $('add-tx-overlay').classList.add('hidden'); editingTxId = null; editingDraftResaleId = null; }
 
 function editTx(id) {
   const t = transactions.find(x => x.id === id);
@@ -5770,6 +5867,7 @@ function editTx(id) {
       const row = $(`tm-${memberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
       row.querySelector('[id$="-pct"]').value  = m.pct;
+      if (m.splitType === 'dollar') setMemberSplitType(`tm-${memberCount}`, 'dollar', '');
     });
   } else {
     addMember(true);
@@ -5818,12 +5916,20 @@ function addMember(isFirst=false) {
   memberCount++;
   const id  = `tm-${memberCount}`;
   const div = document.createElement('div');
-  div.className = 'tm-row'; div.id = id;
+  div.className = 'tm-row'; div.id = id; div.dataset.splitType = 'pct';
   div.innerHTML = `
     <div class="fg" style="margin-bottom:0"><label>Member Name</label>
       <input type="text" placeholder="${isFirst?'Your Name':'Partner Name'}" id="${id}-name" oninput="previewUpdate()" /></div>
-    <div class="fg" style="margin-bottom:0"><label>Split (%)</label>
-      <input type="number" placeholder="${isFirst?'100':'50'}" id="${id}-pct" min="0" max="100" style="width:80px" oninput="previewUpdate()" /></div>
+    <div class="fg" style="margin-bottom:0">
+      <label class="tm-split-label">Split (%)</label>
+      <div style="display:flex;gap:.3rem;align-items:center">
+        <div class="comm-type-row" style="margin:0">
+          <button class="ctype-btn active" id="${id}-st-pct" onclick="setMemberSplitType('${id}','pct','previewUpdate')" style="padding:.15rem .38rem;font-size:.7rem">%</button>
+          <button class="ctype-btn"        id="${id}-st-dlr" onclick="setMemberSplitType('${id}','dollar','previewUpdate')" style="padding:.15rem .38rem;font-size:.7rem">$</button>
+        </div>
+        <input type="number" placeholder="${isFirst?'100':'50'}" id="${id}-pct" min="0" style="width:70px" oninput="previewUpdate()" />
+      </div>
+    </div>
     <button class="btn-rm" onclick="removeMember('${id}')" title="Remove">✕</button>`;
   $('tm-list').appendChild(div);
 }
@@ -5849,20 +5955,25 @@ function previewUpdate() {
   const agent     = afterKick * (brok/100);
 
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value)||0
+    name:      row.querySelector('[id$="-name"]')?.value || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value)||0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
-  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const { userNet, hasAny: hasTeam } = calcMemberSplits(members, agent);
+  const teamDeducted = agent - userNet;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m=>`<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent*m.pct/100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
-  const netRow = teamPctTotal > 0
+  const netRow = hasTeam
     ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
     : `<div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
 
@@ -5892,8 +6003,9 @@ async function saveTx() {
   }
 
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value)||0
+    name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value)||0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
   const closingYear = new Date(closing + 'T00:00:00').getFullYear();
@@ -5949,6 +6061,12 @@ async function saveTx() {
     saveDemoTxs();
   }
 
+  // If promoted from draft, remove the draft entry
+  if (editingDraftResaleId) {
+    resaleDrafts = resaleDrafts.filter(d => d.id !== editingDraftResaleId);
+    saveResaleDraftStorage();
+    editingDraftResaleId = null;
+  }
   closeAddTx();
   selectedYear = closingYear;
   initResale();
@@ -5983,8 +6101,7 @@ function calcPreComm(p) {
                 : (p.kickback || 0);
   const afterKick = Math.max(0, gross - kickAmt);
   const agent     = afterKick * ((p.brokSplit || 100) / 100);
-  const teamPct   = (p.teamMembers || []).reduce((s,m) => s + m.pct, 0);
-  const userNet   = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  const { userNet } = calcMemberSplits(p.teamMembers || [], agent);
   return { gross, afterKick, agent, userNet, kickAmt };
 }
 
@@ -6054,8 +6171,8 @@ function preTxToRow(p, userId) {
     purchase_date: p.purchaseDate,
     category:      p.category,
     occupancy_date: p.occupancyDate || null,
-    comm_basis:    p.commBasis,
-    comm_rate:     p.commRate,
+    comm_basis:    p.commBasis || 0,
+    comm_rate:     p.commRate  || 0,
     kickback:      p.kickback,
     brok_split:    p.brokSplit,
     team_members:  p.teamMembers,
@@ -6081,6 +6198,7 @@ async function loadPreTransactions() {
 ════════════════════════════════════════════ */
 async function initPre() {
   if (!preTxs.length) await loadPreTransactions();
+  loadPreDrafts();
   renderPreYearTabs();
   renderPreSummary();
   renderPreChart();
@@ -6254,18 +6372,20 @@ function renderPreList() {
   const list = [...filteredPre()].sort((a, b) => new Date(b.purchaseDate) - new Date(a.purchaseDate));
   const el   = $('pre-tx-list');
   $('pre-tx-count').textContent = `${list.length} project${list.length !== 1 ? 's' : ''}`;
-
+  const draftsHTML = preDrafts.length
+    ? `<div class="draft-section-hdr">✏ Drafts (${preDrafts.length})</div>${preDrafts.map(d => draftCardHTML(d,'pre')).join('')}`
+    : '';
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏗️</div><h3>No preconstruction projects yet</h3><p>Click "Add Transaction" to log your first preconstruction deal for ${preYear}.</p></div>`;
+    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">🏗️</div><h3>No preconstruction projects yet</h3><p>Click "Add Transaction" to log your first preconstruction deal for ${preYear}.</p></div>`;
     return;
   }
-  el.innerHTML = list.map(preCardHTML).join('');
+  el.innerHTML = draftsHTML + list.map(preCardHTML).join('');
 }
 
 function preCardHTML(p) {
-  const { gross, afterKick, agent, kickAmt } = calcPreComm(p);
-  const teamPctTotal = p.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const { gross, afterKick, agent, kickAmt, userNet } = calcPreComm(p);
+  const { hasAny: hasTeam } = calcMemberSplits(p.teamMembers || [], agent);
+  const teamDeducted = agent - userNet;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const validPayouts = p.payouts.filter(x => x.date);
@@ -6277,7 +6397,11 @@ function preCardHTML(p) {
   const barColor   = allPaid ? 'var(--success)' : hasOverdue ? 'var(--danger)' : 'var(--warning)';
 
   const teamHTML = p.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${p.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${p.teamMembers.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const payoutsHTML = validPayouts.map((pout, i) => {
@@ -6342,10 +6466,10 @@ function preCardHTML(p) {
         <div class="bd-row"><span>Gross Commission ${p.commType === 'flat' ? '(flat fee)' : `(${p.commRate}% of ${fmt(p.commBasis)})`}</span><span>${fmt(gross)}</span></div>
         ${kickAmt > 0 ? `<div class="bd-row"><span>Kickback${p.kickType === 'pct' ? ` (${p.kickback}% of gross)` : p.kickType === 'pct_price' ? ` (${p.kickback}% of price)` : ' (flat)'}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-        ${teamPctTotal > 0
+        ${hasTeam
           ? `<div class="bd-row"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
              <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-             <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+             <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
              <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(userNet)}</span></div>`
           : `<div class="bd-row sep"><span>Brokerage (you keep ${p.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
              <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>`
@@ -6406,7 +6530,7 @@ function openAddPre() {
   $('add-pre-overlay').classList.remove('hidden');
   resetPreForm();
 }
-function closeAddPre() { $('add-pre-overlay').classList.add('hidden'); editingPreId = null; }
+function closeAddPre() { $('add-pre-overlay').classList.add('hidden'); editingPreId = null; editingDraftPreId = null; }
 
 function editPreTx(id) {
   const p = preTxs.find(x => x.id === id);
@@ -6453,6 +6577,7 @@ function editPreTx(id) {
       const row = $(`ptm-${preMemberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
       row.querySelector('[id$="-pct"]').value  = m.pct;
+      if (m.splitType === 'dollar') setMemberSplitType(`ptm-${preMemberCount}`, 'dollar', '');
     });
   } else {
     addPreMember(true);
@@ -6503,12 +6628,20 @@ function addPreMember(isFirst = false) {
   preMemberCount++;
   const id  = `ptm-${preMemberCount}`;
   const div = document.createElement('div');
-  div.className = 'tm-row'; div.id = id;
+  div.className = 'tm-row'; div.id = id; div.dataset.splitType = 'pct';
   div.innerHTML = `
     <div class="fg" style="margin-bottom:0"><label>Member Name</label>
       <input type="text" placeholder="${isFirst ? 'Your Name' : 'Partner Name'}" id="${id}-name" oninput="prePreview()" /></div>
-    <div class="fg" style="margin-bottom:0"><label>Split (%)</label>
-      <input type="number" placeholder="${isFirst ? '100' : '50'}" id="${id}-pct" min="0" max="100" style="width:80px" oninput="prePreview()" /></div>
+    <div class="fg" style="margin-bottom:0">
+      <label class="tm-split-label">Split (%)</label>
+      <div style="display:flex;gap:.3rem;align-items:center">
+        <div class="comm-type-row" style="margin:0">
+          <button class="ctype-btn active" id="${id}-st-pct" onclick="setMemberSplitType('${id}','pct','prePreview')" style="padding:.15rem .38rem;font-size:.7rem">%</button>
+          <button class="ctype-btn"        id="${id}-st-dlr" onclick="setMemberSplitType('${id}','dollar','prePreview')" style="padding:.15rem .38rem;font-size:.7rem">$</button>
+        </div>
+        <input type="number" placeholder="${isFirst ? '100' : '50'}" id="${id}-pct" min="0" style="width:70px" oninput="prePreview()" />
+      </div>
+    </div>
     <button class="btn-rm" onclick="removePreMember('${id}')" title="Remove">✕</button>`;
   $('pre-tm-list').appendChild(div);
 }
@@ -6738,20 +6871,25 @@ function prePreview() {
   const agent     = afterKick * (brok / 100);
 
   const members = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
+    name:      row.querySelector('[id$="-name"]')?.value || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
-  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const { userNet, hasAny: hasTeam } = calcMemberSplits(members, agent);
+  const teamDeducted = agent - userNet;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
-  const netRow = teamPctTotal > 0
+  const netRow = hasTeam
     ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
        <div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(userNet)}</span></div>`
     : `<div class="bd-row total"><span>Your Total Net Commission</span><span>${fmt(agent)}</span></div>`;
 
@@ -6801,7 +6939,7 @@ async function savePre() {
   const category      = $('pf-category').value;
   const occupancyDate    = $('pf-occupancy').value;
   const finalClosingDate = $('pf-closing').value;
-  const commBasis        = parseFloat($('pf-basis').value);
+  const commBasis        = preCommType === 'flat' ? 0 : (parseFloat($('pf-basis').value) || 0);
   const commRate         = parseFloat($('pf-rate').value);
   const commType         = preCommType;
   const kickback         = parseFloat($('pf-kickback').value) || 0;
@@ -6814,8 +6952,9 @@ async function savePre() {
   }
 
   const teamMembers = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
+    name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
   const payouts = [];
@@ -6886,6 +7025,11 @@ async function savePre() {
     savePreDemoTxs();
   }
 
+  if (editingDraftPreId) {
+    preDrafts = preDrafts.filter(d => d.id !== editingDraftPreId);
+    savePreDraftStorage();
+    editingDraftPreId = null;
+  }
   closeAddPre();
   preYear = txYear;
   renderPreYearTabs(); renderPreSummary(); renderPreChart(); renderPreList();
@@ -6918,8 +7062,7 @@ function calcLeaseComm(l) {
                     : (l.kickback || 0);
   const afterKick   = Math.max(0, gross - kickAmt);
   const agent       = afterKick * ((l.brokSplit || 100) / 100);
-  const teamPct     = (l.teamMembers || []).reduce((s,m) => s + m.pct, 0);
-  const userNet     = teamPct > 0 ? agent * (1 - teamPct / 100) : agent;
+  const { userNet } = calcMemberSplits(l.teamMembers || [], agent);
   return { gross, afterKick, agent, userNet, annualRent, monthlyRent, kickAmt };
 }
 
@@ -7027,6 +7170,7 @@ async function loadLeaseTxs() {
 ════════════════════════════════════════════ */
 async function initLease() {
   if (!leaseTxs.length) await loadLeaseTxs();
+  loadLeaseDrafts();
   renderLeaseYearTabs();
   renderLeaseSummary();
   renderLeaseChart();
@@ -7130,18 +7274,20 @@ function renderLeaseList() {
   const list = [...filteredLease()].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const el   = $('lease-tx-list');
   $('lease-tx-count').textContent = `${list.length} transaction${list.length !== 1 ? 's' : ''}`;
-
+  const draftsHTML = leaseDrafts.length
+    ? `<div class="draft-section-hdr">✏ Drafts (${leaseDrafts.length})</div>${leaseDrafts.map(d => draftCardHTML(d,'lease')).join('')}`
+    : '';
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔑</div><h3>No lease transactions yet</h3><p>Click "Add Transaction" to log your first lease deal for ${leaseYear}.</p></div>`;
+    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">🔑</div><h3>No lease transactions yet</h3><p>Click "Add Transaction" to log your first lease deal for ${leaseYear}.</p></div>`;
     return;
   }
-  el.innerHTML = list.map(leaseCardHTML).join('');
+  el.innerHTML = draftsHTML + list.map(leaseCardHTML).join('');
 }
 
 function leaseCardHTML(l) {
-  const { gross, afterKick, agent, annualRent, monthlyRent, kickAmt } = calcLeaseComm(l);
-  const teamPctTotal = l.teamMembers?.reduce((s,m) => s + m.pct, 0) || 0;
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const { gross, afterKick, agent, annualRent, monthlyRent, kickAmt, userNet } = calcLeaseComm(l);
+  const { hasAny: hasTeam } = calcMemberSplits(l.teamMembers || [], agent);
+  const teamDeducted = agent - userNet;
   const today   = new Date(); today.setHours(0, 0, 0, 0);
   const due     = leaseDue(l.startDate);
   const isOverdue = !l.isPaid && due < today;
@@ -7157,7 +7303,11 @@ function leaseCardHTML(l) {
   const termLabel = l.leaseTerm === 'month-to-month' ? 'Month-to-month' : `${l.leaseTerm} months`;
 
   const teamHTML = l.teamMembers?.length
-    ? `<div class="team-box"><div class="team-title">Team Splits</div>${l.teamMembers.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box"><div class="team-title">Team Splits</div>${l.teamMembers.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const commBasis = l.commType === 'pct'
@@ -7216,10 +7366,10 @@ function leaseCardHTML(l) {
         <div class="bd-row"><span>Gross Commission (${commBasis})</span><span>${fmt(gross)}</span></div>
         ${kickAmt > 0 ? `<div class="bd-row"><span>${kickDesc}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
-        ${teamPctTotal > 0
+        ${hasTeam
           ? `<div class="bd-row"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
              <div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-             <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+             <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
              <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
           : `<div class="bd-row sep"><span>Brokerage (you keep ${l.brokSplit}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
              <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`
@@ -7277,7 +7427,7 @@ function openAddLease() {
   $('add-lease-overlay').classList.remove('hidden');
   resetLeaseForm();
 }
-function closeAddLease() { $('add-lease-overlay').classList.add('hidden'); editingLeaseId = null; }
+function closeAddLease() { $('add-lease-overlay').classList.add('hidden'); editingLeaseId = null; editingDraftLeaseId = null; }
 
 function editLeaseTx(id) {
   const l = leaseTxs.find(x => x.id === id);
@@ -7311,6 +7461,7 @@ function editLeaseTx(id) {
       const row = $(`ltm-${leaseMemberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
       row.querySelector('[id$="-pct"]').value  = m.pct;
+      if (m.splitType === 'dollar') setMemberSplitType(`ltm-${leaseMemberCount}`, 'dollar', '');
     });
   } else {
     addLeaseMember(true);
@@ -7369,12 +7520,20 @@ function addLeaseMember(isFirst = false) {
   leaseMemberCount++;
   const id  = `ltm-${leaseMemberCount}`;
   const div = document.createElement('div');
-  div.className = 'tm-row'; div.id = id;
+  div.className = 'tm-row'; div.id = id; div.dataset.splitType = 'pct';
   div.innerHTML = `
     <div class="fg" style="margin-bottom:0"><label>Member Name</label>
       <input type="text" placeholder="${isFirst ? 'Your Name' : 'Partner Name'}" id="${id}-name" oninput="leasePreview()" /></div>
-    <div class="fg" style="margin-bottom:0"><label>Split (%)</label>
-      <input type="number" placeholder="${isFirst ? '100' : '50'}" id="${id}-pct" min="0" max="100" style="width:80px" oninput="leasePreview()" /></div>
+    <div class="fg" style="margin-bottom:0">
+      <label class="tm-split-label">Split (%)</label>
+      <div style="display:flex;gap:.3rem;align-items:center">
+        <div class="comm-type-row" style="margin:0">
+          <button class="ctype-btn active" id="${id}-st-pct" onclick="setMemberSplitType('${id}','pct','leasePreview')" style="padding:.15rem .38rem;font-size:.7rem">%</button>
+          <button class="ctype-btn"        id="${id}-st-dlr" onclick="setMemberSplitType('${id}','dollar','leasePreview')" style="padding:.15rem .38rem;font-size:.7rem">$</button>
+        </div>
+        <input type="number" placeholder="${isFirst ? '100' : '50'}" id="${id}-pct" min="0" style="width:70px" oninput="leasePreview()" />
+      </div>
+    </div>
     <button class="btn-rm" onclick="removeLeaseMember('${id}')" title="Remove">✕</button>`;
   $('lease-tm-list').appendChild(div);
 }
@@ -7400,15 +7559,20 @@ function leasePreview() {
   const agent      = afterKick * (brok / 100);
 
   const members = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
+    name:      row.querySelector('[id$="-name"]')?.value || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
-  const teamPctTotal = members.reduce((s,m) => s + m.pct, 0);
-  const userNet      = teamPctTotal > 0 ? agent * (1 - teamPctTotal / 100) : agent;
+  const { userNet, hasAny: hasTeam } = calcMemberSplits(members, agent);
+  const teamDeducted = agent - userNet;
 
   const teamHTML = members.length
-    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => `<div class="team-row"><span>${m.name}</span><span>${m.pct}% &nbsp;·&nbsp; ${fmt(agent * m.pct / 100)}</span></div>`).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
+    ? `<div class="team-box" style="margin-top:.7rem"><div class="team-title">Team Splits</div>${members.map(m => {
+        const amt = m.splitType === 'dollar' ? m.pct : agent * m.pct / 100;
+        const lbl = m.splitType === 'dollar' ? `${fmt(m.pct)}` : `${m.pct}% · ${fmt(amt)}`;
+        return `<div class="team-row"><span>${m.name}</span><span>${lbl}</span></div>`;
+      }).join('')}<div class="team-row" style="border-top:1px solid var(--border);margin-top:.4rem;padding-top:.4rem;font-weight:var(--fw-semi)"><span>Your Share</span><span>${fmt(userNet)}</span></div></div>`
     : '';
 
   const basisDesc = leaseCommType === 'pct' ? `${comm}% of 1st month rent (${fmt(rent)})` : 'Flat fee';
@@ -7416,9 +7580,9 @@ function leasePreview() {
                   : leaseKickType === 'pct_price'  ? `Kickback (${kick}% of monthly rent)`
                   : 'Kickback';
 
-  const netRow = teamPctTotal > 0
+  const netRow = hasTeam
     ? `<div class="bd-row sep"><span>Pre-Split Net</span><span>${fmt(agent)}</span></div>
-       <div class="bd-row"><span>Team Splits (${teamPctTotal}%)</span><span class="neg">−${fmt(agent - userNet)}</span></div>
+       <div class="bd-row"><span>Team Splits</span><span class="neg">−${fmt(teamDeducted)}</span></div>
        <div class="bd-row total"><span>Your Net Commission</span><span>${fmt(userNet)}</span></div>`
     : `<div class="bd-row total"><span>Your Net Commission</span><span>${fmt(agent)}</span></div>`;
 
@@ -7452,8 +7616,9 @@ async function saveLease() {
   }
 
   const teamMembers = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
-    name: row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:  parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0
+    name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
+    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
   const txYear = new Date(startDate + 'T00:00:00').getFullYear();
@@ -7508,10 +7673,219 @@ async function saveLease() {
     saveLeaseDemoTxs();
   }
 
+  if (editingDraftLeaseId) {
+    leaseDrafts = leaseDrafts.filter(d => d.id !== editingDraftLeaseId);
+    saveLeaseDraftStorage();
+    editingDraftLeaseId = null;
+  }
   closeAddLease();
   leaseYear = txYear;
   renderLeaseYearTabs(); renderLeaseSummary(); renderLeaseChart(); renderLeaseList();
   toast('✓ Lease transaction added!', 'success');
+}
+
+/* ════════════════════════════════════════════
+   DRAFT SAVE / EDIT — ALL THREE TRACKERS
+════════════════════════════════════════════ */
+
+// ── RESALE DRAFT ──
+function saveTxDraft() {
+  const addr   = $('f-addr').value.trim();
+  const client = $('f-client').value.trim();
+  if (!addr && !client) { toast('Enter at least a client name or address to save as draft.', 'error'); return; }
+  const draftId = editingDraftResaleId || ('draft_' + uid());
+  const draft = {
+    id: draftId,
+    address:       addr,
+    clientName:    client,
+    type:          $('f-type').value,
+    category:      $('f-category').value,
+    purchasePrice: parseFloat($('f-price').value) || null,
+    closingDate:   $('f-closing').value || null,
+    commType,
+    commValue:     parseFloat($('f-comm').value) || null,
+    kickback:      parseFloat($('f-kickback').value) || 0,
+    kickType:      resaleKickType,
+    brokSplit:     parseFloat($('f-brok-split').value) || null,
+    teamMembers:   [...$('tm-list').querySelectorAll('.tm-row')].map(r => ({
+      name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
+      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      splitType: r.dataset.splitType || 'pct'
+    })).filter(m => m.name && m.pct > 0),
+    isDraft: true
+  };
+  if (editingDraftResaleId) {
+    const idx = resaleDrafts.findIndex(d => d.id === editingDraftResaleId);
+    if (idx !== -1) resaleDrafts[idx] = draft;
+  } else {
+    resaleDrafts.push(draft);
+  }
+  saveResaleDraftStorage();
+  editingDraftResaleId = null;
+  closeAddTx();
+  renderTxList();
+  toast('💾 Draft saved!', 'success');
+}
+
+function editDraftResale(id) {
+  const d = resaleDrafts.find(x => x.id === id);
+  if (!d) return;
+  editingDraftResaleId = id;
+  editingTxId = null;
+  $('add-tx-title').textContent  = 'Complete Draft Transaction';
+  $('btn-save-tx').textContent   = 'Save Transaction';
+  $('add-tx-overlay').classList.remove('hidden');
+  resetForm();
+  $('f-addr').value          = d.address       || '';
+  $('f-client').value        = d.clientName    || '';
+  $('f-type').value          = d.type          || 'buy';
+  $('f-category').value      = d.category      || 'Condo';
+  $('f-price').value         = d.purchasePrice != null ? d.purchasePrice : '';
+  $('f-closing').value       = d.closingDate   || '';
+  $('f-comm').value          = d.commValue     != null ? d.commValue     : '';
+  $('f-kickback').value      = d.kickback      || '';
+  $('f-brok-split').value    = d.brokSplit     != null ? d.brokSplit     : '';
+  setCommType(d.commType     || 'pct');
+  setResaleKickType(d.kickType || 'dollar');
+  syncBrokSplit();
+  previewUpdate();
+}
+
+// ── LEASE DRAFT ──
+function saveLeaseDraft() {
+  const address  = $('lf-addr').value.trim();
+  const client   = $('lf-client').value.trim();
+  if (!address && !client) { toast('Enter at least a client name or address to save as draft.', 'error'); return; }
+  const draftId = editingDraftLeaseId || ('draft_' + uid());
+  const draft = {
+    id: draftId,
+    repType:      $('lf-rep-type').value,
+    category:     $('lf-category').value,
+    address,
+    clientName:   client,
+    landlordName: $('lf-landlord-name').value.trim(),
+    monthlyRent:  parseFloat($('lf-rent').value)  || null,
+    leaseTerm:    $('lf-term').value,
+    startDate:    $('lf-start').value || null,
+    endDate:      $('lf-end').value   || null,
+    commType:     leaseCommType,
+    commValue:    parseFloat($('lf-comm').value) || null,
+    kickback:     parseFloat($('lf-kickback').value) || 0,
+    kickType:     leaseKickType,
+    brokSplit:    parseFloat($('lf-brok-split').value) || null,
+    teamMembers:  [...$('lease-tm-list').querySelectorAll('.tm-row')].map(r => ({
+      name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
+      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      splitType: r.dataset.splitType || 'pct'
+    })).filter(m => m.name && m.pct > 0),
+    isDraft: true
+  };
+  if (editingDraftLeaseId) {
+    const idx = leaseDrafts.findIndex(d => d.id === editingDraftLeaseId);
+    if (idx !== -1) leaseDrafts[idx] = draft;
+  } else {
+    leaseDrafts.push(draft);
+  }
+  saveLeaseDraftStorage();
+  editingDraftLeaseId = null;
+  closeAddLease();
+  renderLeaseList();
+  toast('💾 Draft saved!', 'success');
+}
+
+function editDraftLease(id) {
+  const d = leaseDrafts.find(x => x.id === id);
+  if (!d) return;
+  editingDraftLeaseId = id;
+  editingLeaseId = null;
+  $('add-lease-title').textContent = 'Complete Draft Lease';
+  $('btn-save-lease').textContent  = 'Save Transaction';
+  $('add-lease-overlay').classList.remove('hidden');
+  resetLeaseForm();
+  $('lf-rep-type').value      = d.repType      || 'tenant';
+  $('lf-category').value      = d.category     || 'Condo';
+  $('lf-addr').value          = d.address      || '';
+  $('lf-client').value        = d.clientName   || '';
+  $('lf-landlord-name').value = d.landlordName || '';
+  $('lf-rent').value          = d.monthlyRent  != null ? d.monthlyRent  : '';
+  $('lf-term').value          = d.leaseTerm    || '12';
+  $('lf-start').value         = d.startDate    || '';
+  $('lf-end').value           = d.endDate      || '';
+  $('lf-comm').value          = d.commValue    != null ? d.commValue    : '';
+  $('lf-kickback').value      = d.kickback     || '';
+  $('lf-brok-split').value    = d.brokSplit    != null ? d.brokSplit    : '';
+  setLeaseCommType(d.commType  || 'pct');
+  setLeaseKickType(d.kickType  || 'dollar');
+  leaseSyncBrok();
+  leasePreview();
+}
+
+// ── PRECON DRAFT ──
+function savePreDraft() {
+  const project = $('pf-project').value.trim();
+  const client  = $('pf-client').value.trim();
+  if (!project && !client) { toast('Enter at least a project name or client to save as draft.', 'error'); return; }
+  const draftId = editingDraftPreId || ('draft_' + uid());
+  const draft = {
+    id: draftId,
+    projectName:    project,
+    clientName:     client,
+    purchasePrice:  parseFloat($('pf-price').value)         || null,
+    purchaseDate:   $('pf-purchase-date').value             || null,
+    category:       $('pf-category').value,
+    occupancyDate:  $('pf-occupancy').value                 || null,
+    finalClosingDate: $('pf-closing').value                 || null,
+    commBasis:      parseFloat($('pf-basis').value)         || null,
+    commRate:       parseFloat($('pf-rate').value)          || null,
+    commType:       preCommType,
+    kickback:       parseFloat($('pf-kickback').value)      || 0,
+    kickType:       preKickType,
+    brokSplit:      parseFloat($('pf-brok').value)          || null,
+    teamMembers:    [...$('pre-tm-list').querySelectorAll('.tm-row')].map(r => ({
+      name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
+      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      splitType: r.dataset.splitType || 'pct'
+    })).filter(m => m.name && m.pct > 0),
+    payouts: [],
+    isDraft: true,
+    year: new Date().getFullYear()
+  };
+  if (editingDraftPreId) {
+    const idx = preDrafts.findIndex(d => d.id === editingDraftPreId);
+    if (idx !== -1) preDrafts[idx] = draft;
+  } else {
+    preDrafts.push(draft);
+  }
+  savePreDraftStorage();
+  editingDraftPreId = null;
+  closeAddPre();
+  renderPreList();
+  toast('💾 Draft saved!', 'success');
+}
+
+function editDraftPre(id) {
+  const d = preDrafts.find(x => x.id === id);
+  if (!d) return;
+  editingDraftPreId = id;
+  editingPreId = null;
+  $('add-pre-title').textContent = 'Complete Draft Project';
+  $('btn-save-pre').textContent  = 'Save Transaction';
+  $('add-pre-overlay').classList.remove('hidden');
+  resetPreForm();
+  $('pf-project').value       = d.projectName     || '';
+  $('pf-client').value        = d.clientName      || '';
+  $('pf-price').value         = d.purchasePrice   != null ? d.purchasePrice   : '';
+  $('pf-purchase-date').value = d.purchaseDate    || new Date().toISOString().split('T')[0];
+  $('pf-category').value      = d.category        || 'Condo';
+  $('pf-occupancy').value     = d.occupancyDate   || '';
+  $('pf-closing').value       = d.finalClosingDate|| '';
+  $('pf-basis').value         = d.commBasis       != null ? d.commBasis       : '';
+  $('pf-rate').value          = d.commRate        != null ? d.commRate        : '';
+  $('pf-kickback').value      = d.kickback        || '';
+  $('pf-brok').value          = d.brokSplit       != null ? d.brokSplit       : '';
+  setPreKickType(d.kickType   || 'dollar');
+  setPreCommType(d.commType   || 'pct');
+  prePreview();
 }
 
 /* ════════════════════════════════════════════

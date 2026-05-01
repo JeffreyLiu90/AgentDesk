@@ -5589,7 +5589,7 @@ function setMemberSplitType(rowId, type, previewFn) {
   row.querySelector('[id$="-st-dlr"]')?.classList.toggle('active', type === 'dollar');
   const lbl = row.querySelector('.tm-split-label');
   if (lbl) lbl.textContent = type === 'pct' ? 'Split (%)' : 'Split ($)';
-  const inp = row.querySelector('[id$="-pct"]');
+  const inp = row.querySelector('input[id$="-pct"]');
   if (inp) inp.placeholder = type === 'pct' ? '50' : '5000';
   if (previewFn === 'previewUpdate') previewUpdate();
   else if (previewFn === 'leasePreview') leasePreview();
@@ -5765,6 +5765,7 @@ function txCardHTML(t) {
         </div>
         <div class="expand-btn" id="arr-${t.id}">▼</div>
         <button class="edit-btn" onclick="event.stopPropagation(); editTx('${t.id}')" title="Edit">✏️</button>
+        <button class="edit-btn" onclick="event.stopPropagation(); duplicateTx('${t.id}')" title="Duplicate" style="opacity:.75">⧉</button>
         <button class="del-btn" onclick="event.stopPropagation(); deleteTx('${t.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -5827,6 +5828,20 @@ async function deleteTx(id) {
   toast('Transaction deleted.');
 }
 
+async function duplicateTx(id) {
+  const orig = transactions.find(t => t.id === id);
+  if (!orig) return;
+  const copy = { ...orig, id: uid(), isPaid: false, address: orig.address + ' (Copy)' };
+  if (isConfigured) {
+    const { error } = await sb.from('transactions').insert([txToRow(copy, currentUser.id)]);
+    if (error) { toast('Error duplicating: ' + error.message, 'error'); return; }
+  }
+  transactions.push(copy);
+  saveDemoTxs();
+  renderYearTabs(); renderSummary(); renderChart(); renderTxList();
+  toast('✓ Transaction duplicated!', 'success');
+}
+
 /* ════════════════════════════════════════════
    ADD TRANSACTION MODAL
 ════════════════════════════════════════════ */
@@ -5866,7 +5881,7 @@ function editTx(id) {
       addMember();
       const row = $(`tm-${memberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
-      row.querySelector('[id$="-pct"]').value  = m.pct;
+      row.querySelector('input[id$="-pct"]').value  = m.pct;
       if (m.splitType === 'dollar') setMemberSplitType(`tm-${memberCount}`, 'dollar', '');
     });
   } else {
@@ -5956,7 +5971,7 @@ function previewUpdate() {
 
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value)||0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value)||0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -6004,7 +6019,7 @@ async function saveTx() {
 
   const members = [...$('tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value)||0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value)||0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -6449,6 +6464,7 @@ function preCardHTML(p) {
         </div>
         <div class="expand-btn" id="pre-arr-${p.id}">▼</div>
         <button class="edit-btn" onclick="event.stopPropagation(); editPreTx('${p.id}')" title="Edit">✏️</button>
+        <button class="edit-btn" onclick="event.stopPropagation(); duplicatePreTx('${p.id}')" title="Duplicate" style="opacity:.75">⧉</button>
         <button class="del-btn" onclick="event.stopPropagation(); deletePreTx('${p.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -6520,6 +6536,25 @@ async function deletePreTx(id) {
   toast('Project deleted.');
 }
 
+async function duplicatePreTx(id) {
+  const orig = preTxs.find(p => p.id === id);
+  if (!orig) return;
+  const copy = {
+    ...orig,
+    id: uid(),
+    projectName: orig.projectName + ' (Copy)',
+    payouts: (orig.payouts || []).map(po => ({ ...po, isPaid: false }))
+  };
+  if (isConfigured) {
+    const { error } = await sb.from('pre_transactions').insert([preTxToRow(copy, currentUser.id)]);
+    if (error) { toast('Error duplicating: ' + error.message, 'error'); return; }
+  }
+  preTxs.push(copy);
+  savePreDemoTxs();
+  renderPreYearTabs(); renderPreSummary(); renderPreChart(); renderPreList();
+  toast('✓ Project duplicated!', 'success');
+}
+
 /* ════════════════════════════════════════════
    PRECONSTRUCTION — ADD MODAL
 ════════════════════════════════════════════ */
@@ -6576,7 +6611,7 @@ function editPreTx(id) {
       addPreMember();
       const row = $(`ptm-${preMemberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
-      row.querySelector('[id$="-pct"]').value  = m.pct;
+      row.querySelector('input[id$="-pct"]').value  = m.pct;
       if (m.splitType === 'dollar') setMemberSplitType(`ptm-${preMemberCount}`, 'dollar', '');
     });
   } else {
@@ -6872,7 +6907,7 @@ function prePreview() {
 
   const members = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value) || 0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -6953,7 +6988,7 @@ async function savePre() {
 
   const teamMembers = [...$('pre-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value) || 0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -7344,6 +7379,7 @@ function leaseCardHTML(l) {
         </div>
         <div class="expand-btn" id="lease-arr-${l.id}">▼</div>
         <button class="edit-btn" onclick="event.stopPropagation(); editLeaseTx('${l.id}')" title="Edit">✏️</button>
+        <button class="edit-btn" onclick="event.stopPropagation(); duplicateLeaseTx('${l.id}')" title="Duplicate" style="opacity:.75">⧉</button>
         <button class="del-btn" onclick="event.stopPropagation(); deleteLeaseTx('${l.id}')" title="Delete">🗑</button>
       </div>
     </div>
@@ -7417,6 +7453,20 @@ async function deleteLeaseTx(id) {
   toast('Transaction deleted.');
 }
 
+async function duplicateLeaseTx(id) {
+  const orig = leaseTxs.find(l => l.id === id);
+  if (!orig) return;
+  const copy = { ...orig, id: uid(), isPaid: false, address: orig.address + ' (Copy)' };
+  if (isConfigured) {
+    const { error } = await sb.from('lease_transactions').insert([leaseTxToRow(copy, currentUser.id)]);
+    if (error) { toast('Error duplicating: ' + error.message, 'error'); return; }
+  }
+  leaseTxs.push(copy);
+  saveLeaseDemoTxs();
+  renderLeaseYearTabs(); renderLeaseSummary(); renderLeaseChart(); renderLeaseList();
+  toast('✓ Transaction duplicated!', 'success');
+}
+
 /* ════════════════════════════════════════════
    LEASE — ADD MODAL
 ════════════════════════════════════════════ */
@@ -7460,7 +7510,7 @@ function editLeaseTx(id) {
       addLeaseMember();
       const row = $(`ltm-${leaseMemberCount}`);
       row.querySelector('[id$="-name"]').value = m.name;
-      row.querySelector('[id$="-pct"]').value  = m.pct;
+      row.querySelector('input[id$="-pct"]').value  = m.pct;
       if (m.splitType === 'dollar') setMemberSplitType(`ltm-${leaseMemberCount}`, 'dollar', '');
     });
   } else {
@@ -7560,7 +7610,7 @@ function leasePreview() {
 
   const members = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value) || 0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -7617,7 +7667,7 @@ async function saveLease() {
 
   const teamMembers = [...$('lease-tm-list').querySelectorAll('.tm-row')].map(row => ({
     name:      row.querySelector('[id$="-name"]')?.value.trim() || 'Member',
-    pct:       parseFloat(row.querySelector('[id$="-pct"]')?.value) || 0,
+    pct:       parseFloat(row.querySelector('input[id$="-pct"]')?.value) || 0,
     splitType: row.dataset.splitType || 'pct'
   })).filter(m => m.name && m.pct > 0);
 
@@ -7709,7 +7759,7 @@ function saveTxDraft() {
     brokSplit:     parseFloat($('f-brok-split').value) || null,
     teamMembers:   [...$('tm-list').querySelectorAll('.tm-row')].map(r => ({
       name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
-      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      pct:       parseFloat(r.querySelector('input[id$="-pct"]')?.value) || 0,
       splitType: r.dataset.splitType || 'pct'
     })).filter(m => m.name && m.pct > 0),
     isDraft: true
@@ -7775,7 +7825,7 @@ function saveLeaseDraft() {
     brokSplit:    parseFloat($('lf-brok-split').value) || null,
     teamMembers:  [...$('lease-tm-list').querySelectorAll('.tm-row')].map(r => ({
       name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
-      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      pct:       parseFloat(r.querySelector('input[id$="-pct"]')?.value) || 0,
       splitType: r.dataset.splitType || 'pct'
     })).filter(m => m.name && m.pct > 0),
     isDraft: true
@@ -7843,7 +7893,7 @@ function savePreDraft() {
     brokSplit:      parseFloat($('pf-brok').value)          || null,
     teamMembers:    [...$('pre-tm-list').querySelectorAll('.tm-row')].map(r => ({
       name:      r.querySelector('[id$="-name"]')?.value.trim() || '',
-      pct:       parseFloat(r.querySelector('[id$="-pct"]')?.value) || 0,
+      pct:       parseFloat(r.querySelector('input[id$="-pct"]')?.value) || 0,
       splitType: r.dataset.splitType || 'pct'
     })).filter(m => m.name && m.pct > 0),
     payouts: [],

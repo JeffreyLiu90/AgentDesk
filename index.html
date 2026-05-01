@@ -2001,6 +2001,7 @@
         <div class="mobile-nav-item" onclick="showView('lease')">🔑 Lease</div>
         <div class="mobile-nav-item" onclick="showView('resale')">🏠 Resale</div>
         <div class="mobile-nav-item" onclick="showView('preconstruction')">🏗️ Preconstruction</div>
+        <div class="mobile-nav-item" onclick="showView('commercial')">🏢 Commercial <span style="font-size:.65rem;font-weight:700;background:var(--navy-subtle);color:var(--navy);padding:.1rem .4rem;border-radius:2rem;margin-left:.3rem">Soon</span></div>
         <div class="mobile-nav-item" onclick="showView('total-comm')">💰 Total Overview</div>
       </div>
       <div class="mobile-nav-section-title user-nav">Tools</div>
@@ -2053,6 +2054,10 @@
           <div class="dd-item" onclick="showView('preconstruction')">
             <div class="dd-icon" style="background:rgba(212,175,55,0.1)">🏗️</div>
             <div class="dd-label"><strong>Preconstruction</strong><span>New builds &amp; condos</span></div>
+          </div>
+          <div class="dd-item" onclick="showView('commercial')">
+            <div class="dd-icon" style="background:rgba(100,116,139,0.1)">🏢</div>
+            <div class="dd-label"><strong>Commercial</strong><span style="display:flex;align-items:center;gap:.3rem">Office, retail &amp; industrial <span style="font-size:.65rem;font-weight:700;background:var(--navy-subtle);color:var(--navy);padding:.1rem .4rem;border-radius:2rem;text-transform:uppercase;letter-spacing:.04em">Soon</span></span></div>
           </div>
           <div style="border-top:1px solid var(--border);margin:.3rem 0"></div>
           <div class="dd-item" onclick="showView('total-comm')">
@@ -2897,6 +2902,22 @@
     </div>
 
     <!-- Total Commission View -->
+    <div id="view-commercial" class="hidden">
+      <div class="view-topbar">
+        <div>
+          <div class="breadcrumb"><span>Commissions</span><span>›</span><span>Commercial</span></div>
+          <div class="view-title">🏢 Commercial Commission</div>
+          <div class="view-subtitle">Track commercial real estate commissions</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5rem 2rem;text-align:center;gap:1.2rem">
+        <div style="font-size:3.5rem">🏢</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--text)">Commercial Commission</div>
+        <div style="font-size:.95rem;color:var(--muted);max-width:420px;line-height:1.6">This feature is coming soon. Commercial commission tracking with office, retail, industrial, and multi-unit deal types will be available here.</div>
+        <div style="margin-top:.5rem;padding:.5rem 1.2rem;background:var(--navy-subtle);color:var(--navy);border-radius:2rem;font-size:.8rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Coming Soon</div>
+      </div>
+    </div>
+
     <div id="view-total-comm" class="hidden">
       <div class="view-topbar">
         <div>
@@ -3711,11 +3732,17 @@
         <div class="fg"><label>Final Closing Date <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="date" id="pf-closing" oninput="recalcAllPayoutDates()" /></div>
       </div>
 
-      <div class="sec-divider">💰 Commission Basis</div>
-      <div class="pf-info-box">Commission can be calculated on the full purchase price or net of HST — choose whichever your agreement specifies.</div>
+      <div class="sec-divider">💰 Commission</div>
+      <div style="margin-bottom:.8rem">
+        <div style="font-size:.8rem;font-weight:700;margin-bottom:.5rem">Commission Type</div>
+        <div class="comm-type-row">
+          <button class="ctype-btn active" id="pf-comm-pct-btn"  onclick="setPreCommType('pct')">% of Basis</button>
+          <button class="ctype-btn"        id="pf-comm-flat-btn" onclick="setPreCommType('flat')">Flat Amount ($)</button>
+        </div>
+      </div>
       <div class="form-row">
-        <div class="fg"><label>Commission Basis Price ($) *</label><input type="number" id="pf-basis" placeholder="Same as purchase price, or net of HST" min="0" oninput="prePreview()" /></div>
-        <div class="fg"><label>Commission Rate (%) *</label><input type="number" id="pf-rate" placeholder="2.5" step="0.01" min="0" oninput="prePreview()" /></div>
+        <div class="fg" id="pf-basis-wrap"><label>Commission Basis Price ($) *</label><input type="number" id="pf-basis" placeholder="Same as purchase price, or net of HST" min="0" oninput="prePreview()" /></div>
+        <div class="fg"><label id="pf-rate-label">Commission Rate (%) *</label><input type="number" id="pf-rate" placeholder="2.5" step="0.01" min="0" oninput="prePreview()" /></div>
       </div>
       <div class="form-row">
         <div class="fg">
@@ -3956,42 +3983,60 @@ function renderTotalComm() {
     });
   });
 
-  // ── PRECONSTRUCTION (per payout segment, bucketed by payout date year) ──
-  // We iterate ALL precon projects (not filtered by signing year) and show only the
-  // payouts whose date falls in the currently selected year. This means a 2024 contract
-  // with a 2027 payout correctly appears under 2027.
+  // ── PRECONSTRUCTION (per payout segment) ──
+  // • "All Year"  → show every project signed in yr (p.year === yr), all their payouts.
+  //                 Count always matches the precon tracker.
+  // • "Realized"  → show paid payouts whose date falls in yr, from any project.
+  // • "Expected"  → show unpaid payouts whose date falls in yr, from any project.
   preTxs.forEach(p => {
     const { userNet }  = calcPreComm(p);
     const payouts      = p.payouts || [];
     const datedPayouts = payouts.filter(x => x.date);
-    // validCount + totalPct use ALL dated payouts so proportional math stays correct
     const validCount   = datedPayouts.length || 1;
     const totalPct     = datedPayouts.filter(x => x.commType === 'pct').reduce((s,x) => s + (x.commValue || 0), 0);
 
-    if (payouts.length === 0 || datedPayouts.length === 0) {
-      // No payout schedule — attribute to occupancy date year (or signing year)
-      const occYear = p.occupancyDate
-        ? new Date(p.occupancyDate + 'T00:00:00').getFullYear()
-        : p.year;
-      if (occYear !== yr) return;
-      const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
-      if (tcMode === 'realized' && !realized) return;
-      if (tcMode === 'expected' && realized)  return;
-      items.push({ type:'precon', label: p.projectName || 'Precon Deal',
-        address: p.clientName, amount: userNet, date: p.occupancyDate, status: realized ? 'paid' : 'future' });
-    } else {
-      // Only include payouts whose date falls in the selected year
-      datedPayouts
-        .filter(po => new Date(po.date + 'T00:00:00').getFullYear() === yr)
-        .forEach(po => {
-          const poDate   = new Date(po.date + 'T00:00:00');
-          const realized = po.isPaid || poDate <= today;
-          if (tcMode === 'realized' && !realized) return;
-          if (tcMode === 'expected' && realized)  return;
+    if (tcMode === 'all') {
+      // "All Year": project must belong to this signing year
+      if (p.year !== yr) return;
+      if (payouts.length === 0 || datedPayouts.length === 0) {
+        const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
+        items.push({ type:'precon', label: p.projectName || 'Precon Deal',
+          address: p.clientName, amount: userNet, date: p.occupancyDate,
+          status: realized ? 'paid' : 'future' });
+      } else {
+        datedPayouts.forEach(po => {
+          const poDate = new Date(po.date + 'T00:00:00');
           items.push({ type:'precon', label: `${p.projectName} — ${po.label || 'Payout'}`,
             address: p.clientName, amount: payoutAmt(po, userNet, validCount, totalPct), date: po.date,
             status: po.isPaid ? 'paid' : (poDate <= today ? 'pending' : 'future') });
         });
+      }
+    } else {
+      // "Realized" / "Expected": filter strictly by payout date year
+      if (payouts.length === 0 || datedPayouts.length === 0) {
+        const occYear = p.occupancyDate
+          ? new Date(p.occupancyDate + 'T00:00:00').getFullYear()
+          : p.year;
+        if (occYear !== yr) return;
+        const realized = p.occupancyDate && new Date(p.occupancyDate + 'T00:00:00') <= today;
+        if (tcMode === 'realized' && !realized) return;
+        if (tcMode === 'expected' && realized)  return;
+        items.push({ type:'precon', label: p.projectName || 'Precon Deal',
+          address: p.clientName, amount: userNet, date: p.occupancyDate,
+          status: realized ? 'paid' : 'future' });
+      } else {
+        datedPayouts
+          .filter(po => new Date(po.date + 'T00:00:00').getFullYear() === yr)
+          .forEach(po => {
+            const poDate   = new Date(po.date + 'T00:00:00');
+            const realized = po.isPaid || poDate <= today;
+            if (tcMode === 'realized' && !realized) return;
+            if (tcMode === 'expected' && realized)  return;
+            items.push({ type:'precon', label: `${p.projectName} — ${po.label || 'Payout'}`,
+              address: p.clientName, amount: payoutAmt(po, userNet, validCount, totalPct), date: po.date,
+              status: po.isPaid ? 'paid' : (poDate <= today ? 'pending' : 'future') });
+          });
+      }
     }
   });
 
@@ -5470,7 +5515,7 @@ function saveDemoTxs() {
    NAVIGATION
 ════════════════════════════════════════════ */
 function showView(v, subType) {
-  ['view-dashboard','view-resale','view-preconstruction','view-lease','view-market','view-directory','view-analyzer','view-checklist','view-saved-projects','view-clients','view-registrants','view-admin','view-total-comm','view-school-zone','view-expenses']
+  ['view-dashboard','view-resale','view-preconstruction','view-lease','view-market','view-directory','view-analyzer','view-checklist','view-saved-projects','view-clients','view-registrants','view-admin','view-total-comm','view-school-zone','view-expenses','view-commercial']
     .forEach(id => $(id)?.classList.add('hidden'));
   closeMobileNav();
   if (v === 'dashboard')        { $('view-dashboard').classList.remove('hidden'); updateDashStats(); }
@@ -5486,6 +5531,7 @@ function showView(v, subType) {
   if (v === 'registrants')      { if (!isAdminLoggedIn) { showAdminLogin(); return; } $('view-registrants').classList.remove('hidden'); initRegistrants(); }
   if (v === 'admin')            { if (!isAdminLoggedIn) { showAdminLogin(); return; } $('view-admin').classList.remove('hidden'); initAdminPanel(); }
   if (v === 'total-comm')   { $('view-total-comm').classList.remove('hidden'); initTotalComm(); }
+  if (v === 'commercial')   { $('view-commercial').classList.remove('hidden'); }
   if (v === 'school-zone')  { $('view-school-zone').classList.remove('hidden'); }
   if (v === 'expenses')     { $('view-expenses').classList.remove('hidden'); initExpenses(); }
 }
@@ -5919,6 +5965,7 @@ let preMemberCount  = 0;
 let prePayoutCount  = 1;
 let payoutCommTypes = {}; // keyed 1..N
 let preKickType     = 'dollar'; // 'dollar' | 'pct' | 'pct_price'
+let preCommType     = 'pct';   // 'pct' | 'flat'
 let preChartMode    = 'paid';   // 'paid' | 'all'
 
 const PRE_DEMO_KEY = 'agentdesk_pre_txs';
@@ -5928,7 +5975,9 @@ function savePreDemoTxs() {
 }
 
 function calcPreComm(p) {
-  const gross   = (p.commBasis || 0) * (p.commRate || 0) / 100;
+  const gross   = p.commType === 'flat'
+    ? (p.commRate || 0)
+    : (p.commBasis || 0) * (p.commRate || 0) / 100;
   const kickAmt = p.kickType === 'pct'       ? gross * (p.kickback || 0) / 100
                 : p.kickType === 'pct_price' ? (p.purchasePrice || 0) * (p.kickback || 0) / 100
                 : (p.kickback || 0);
@@ -5986,6 +6035,7 @@ function preRowToTx(row) {
     occupancyDate: row.occupancy_date,
     commBasis:     row.comm_basis,
     commRate:      row.comm_rate,
+    commType:      row.comm_type || 'pct',
     kickback:      row.kickback,
     brokSplit:     row.brok_split,
     teamMembers:   row.team_members || [],
@@ -6006,6 +6056,7 @@ function preTxToRow(p, userId) {
     occupancy_date: p.occupancyDate || null,
     comm_basis:    p.commBasis,
     comm_rate:     p.commRate,
+    comm_type:     p.commType || 'pct',
     kickback:      p.kickback,
     brok_split:    p.brokSplit,
     team_members:  p.teamMembers,
@@ -6281,15 +6332,15 @@ function preCardHTML(p) {
     <div class="tx-details" id="pre-det-${p.id}">
       <div class="details-grid">
         <div class="d-item"><label>Purchase Price</label><div class="d-val">${fmt(p.purchasePrice)}</div></div>
-        <div class="d-item"><label>Commission Basis</label><div class="d-val">${fmt(p.commBasis)}</div></div>
-        <div class="d-item"><label>Commission Rate</label><div class="d-val">${p.commRate}%</div></div>
+        ${p.commType !== 'flat' ? `<div class="d-item"><label>Commission Basis</label><div class="d-val">${fmt(p.commBasis)}</div></div>` : ''}
+        <div class="d-item"><label>Commission</label><div class="d-val">${p.commType === 'flat' ? fmt(p.commRate) + ' (flat)' : p.commRate + '% of basis'}</div></div>
         <div class="d-item"><label>Category</label><div class="d-val">${p.category}</div></div>
         <div class="d-item"><label>Occupancy Date</label><div class="d-val">${p.occupancyDate ? fmtDate(p.occupancyDate) : '—'}</div></div>
         <div class="d-item"><label>Brokerage Split</label><div class="d-val">${p.brokSplit}% to you</div></div>
       </div>
       <div class="breakdown-box">
         <div class="breakdown-title">Commission Breakdown</div>
-        <div class="bd-row"><span>Gross Commission (${p.commRate}% of ${fmt(p.commBasis)})</span><span>${fmt(gross)}</span></div>
+        <div class="bd-row"><span>Gross Commission ${p.commType === 'flat' ? '(flat fee)' : `(${p.commRate}% of ${fmt(p.commBasis)})`}</span><span>${fmt(gross)}</span></div>
         ${kickAmt > 0 ? `<div class="bd-row"><span>Kickback${p.kickType === 'pct' ? ` (${p.kickback}% of gross)` : p.kickType === 'pct_price' ? ` (${p.kickback}% of price)` : ' (flat)'}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
         <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
         ${teamPctTotal > 0
@@ -6378,6 +6429,7 @@ function editPreTx(id) {
   $('pf-kickback').value      = p.kickback || '';
   $('pf-brok').value          = p.brokSplit;
   setPreKickType(p.kickType || 'dollar');
+  setPreCommType(p.commType || 'pct');
   // Payout schedule — render the right number of slots first
   prePayoutCount = Math.max(1, p.payouts.length);
   payoutCommTypes = {};
@@ -6418,6 +6470,17 @@ function setPreKickType(t) {
   prePreview();
 }
 
+function setPreCommType(type) {
+  preCommType = type;
+  $('pf-comm-pct-btn').classList.toggle('active',  type === 'pct');
+  $('pf-comm-flat-btn').classList.toggle('active', type === 'flat');
+  $('pf-basis-wrap').style.display   = type === 'pct' ? '' : 'none';
+  $('pf-rate-label').textContent     = type === 'pct' ? 'Commission Rate (%) *' : 'Commission Amount ($) *';
+  $('pf-rate').placeholder           = type === 'pct' ? '2.5' : '25000';
+  $('pf-rate').step                  = type === 'pct' ? '0.01' : '1';
+  prePreview();
+}
+
 function resetPreForm() {
   ['pf-project','pf-client','pf-price','pf-basis','pf-rate','pf-kickback','pf-brok'].forEach(id => {
     const el = $(id); if (el) el.value = '';
@@ -6430,6 +6493,7 @@ function resetPreForm() {
   payoutCommTypes = {};
   renderPayoutSlots(false);
   setPreKickType('dollar');
+  setPreCommType('pct');
   $('pre-tm-list').innerHTML = '';
   preMemberCount = 0;
   addPreMember(true);
@@ -6662,12 +6726,12 @@ function prePreview() {
   const brok   = parseFloat($('pf-brok').value) || 0;
   const price  = parseFloat($('pf-price').value) || 0;
 
-  if (!basis && !rate) {
+  if (!rate && (preCommType === 'pct' ? !basis : true)) {
     $('pre-comm-preview').innerHTML = '<div class="preview-empty">Fill in the details above to see your commission breakdown</div>';
     return;
   }
 
-  const gross     = basis * rate / 100;
+  const gross     = preCommType === 'flat' ? rate : basis * rate / 100;
   const kickAmt   = preKickType === 'pct'       ? gross * kick / 100
                   : preKickType === 'pct_price'  ? price * kick / 100
                   : kick;
@@ -6721,7 +6785,7 @@ function prePreview() {
 
   $('pre-comm-preview').innerHTML = `
     <div class="breakdown-title">Commission Breakdown Preview</div>
-    <div class="bd-row"><span>Gross Commission (${rate}% of ${fmt(basis)})</span><span>${fmt(gross)}</span></div>
+    <div class="bd-row"><span>Gross Commission ${preCommType === 'flat' ? '(flat fee)' : `(${rate}% of ${fmt(basis)})`}</span><span>${fmt(gross)}</span></div>
     ${kickAmt > 0 ? `<div class="bd-row"><span>Kickback ${preKickType==='pct'?`(${kick}% of gross)`:preKickType==='pct_price'?`(${kick}% of price)`:''}</span><span class="neg">−${fmt(kickAmt)}</span></div>` : ''}
     <div class="bd-row"><span>After Kickback</span><span>${fmt(afterKick)}</span></div>
     <div class="bd-row"><span>Brokerage (you keep ${brok}%)</span><span class="neg">−${fmt(afterKick - agent)}</span></div>
@@ -6739,12 +6803,14 @@ async function savePre() {
   const occupancyDate    = $('pf-occupancy').value;
   const finalClosingDate = $('pf-closing').value;
   const commBasis        = parseFloat($('pf-basis').value);
-  const commRate      = parseFloat($('pf-rate').value);
-  const kickback      = parseFloat($('pf-kickback').value) || 0;
-  const kickType      = preKickType;
-  const brokSplit     = parseFloat($('pf-brok').value);
+  const commRate         = parseFloat($('pf-rate').value);
+  const commType         = preCommType;
+  const kickback         = parseFloat($('pf-kickback').value) || 0;
+  const kickType         = preKickType;
+  const brokSplit        = parseFloat($('pf-brok').value);
 
-  if (!projectName || !clientName || !purchaseDate || isNaN(purchasePrice) || isNaN(commBasis) || isNaN(commRate) || isNaN(brokSplit)) {
+  const commBasisOk = commType === 'flat' || !isNaN(commBasis);
+  if (!projectName || !clientName || !purchaseDate || isNaN(purchasePrice) || !commBasisOk || isNaN(commRate) || isNaN(brokSplit)) {
     toast('Please fill in all required fields.', 'error'); return;
   }
 
@@ -6780,7 +6846,7 @@ async function savePre() {
     const updated = {
       ...preTxs[idx],
       projectName, clientName, purchasePrice, purchaseDate,
-      category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, kickType, brokSplit,
+      category, occupancyDate, finalClosingDate, commBasis, commRate, commType, kickback, kickType, brokSplit,
       teamMembers, payouts: mergedPayouts, year: txYear
     };
     setLoading('btn-save-pre', true);
@@ -6804,7 +6870,7 @@ async function savePre() {
   /* ── ADD MODE ── */
   const newPre = {
     id: uid(), projectName, clientName, purchasePrice, purchaseDate,
-    category, occupancyDate, finalClosingDate, commBasis, commRate, kickback, kickType, brokSplit,
+    category, occupancyDate, finalClosingDate, commBasis, commRate, commType, kickback, kickType, brokSplit,
     teamMembers, payouts, year: txYear
   };
 

@@ -553,6 +553,26 @@
     .dash-card-cta.active-cta { color: var(--navy); }
     .dash-card-cta.muted-cta { color: var(--gray-300); }
 
+    /* Upcoming Dates Panel */
+    .dash-alerts-panel { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--r-xl); padding: 1.25rem 1.5rem; margin-bottom: 1.75rem; max-width: 1120px; }
+    .dash-alerts-title { font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+    .dash-alerts-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .dash-alert-col-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: .6rem; display: flex; align-items: center; gap: .35rem; }
+    .dash-alert-item { display: flex; justify-content: space-between; align-items: flex-start; padding: .45rem .6rem; border-radius: var(--r-md); margin-bottom: .3rem; gap: .75rem; cursor: pointer; transition: background var(--t-base); }
+    .dash-alert-item:hover { background: var(--gray-100); }
+    .dash-alert-item-left { min-width: 0; }
+    .dash-alert-label { font-size: .8rem; font-weight: var(--fw-semi); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+    .dash-alert-sub { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+    .dash-alert-right { text-align: right; flex-shrink: 0; }
+    .dash-alert-date { font-size: .72rem; font-weight: 600; white-space: nowrap; }
+    .dash-alert-amt  { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+    .dash-alert-item.is-overdue  { background: rgba(239,68,68,.06); }
+    .dash-alert-item.is-overdue .dash-alert-date { color: var(--danger); }
+    .dash-alert-item.is-upcoming .dash-alert-date { color: var(--warning); }
+    .dash-alert-item.is-renewal  .dash-alert-date { color: var(--navy); }
+    .dash-alert-empty { font-size: .8rem; color: var(--muted); font-style: italic; padding: .3rem .6rem; }
+    .dash-alert-countdown { display: inline-block; background: var(--navy-subtle); color: var(--navy); font-size: .68rem; font-weight: 700; border-radius: 99px; padding: .1rem .5rem; }
+
     /* Stats strip */
     .dash-stats { display: flex; gap: 0.875rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
     .dash-stat {
@@ -714,6 +734,11 @@
     .tx-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
     .tx-header-title { font-size: var(--text-md); font-weight: var(--fw-bold); }
     .tx-count { font-size: var(--text-xs); color: var(--muted); background: var(--bg); padding: 0.25rem 0.7rem; border-radius: var(--r-full); }
+    .tx-search-wrap { position: relative; margin-bottom: 0.75rem; }
+    .tx-search-wrap .tx-search-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .9rem; pointer-events: none; }
+    .tx-search-input { width: 100%; padding: .5rem .9rem .5rem 2.2rem; border: 1.5px solid var(--border); border-radius: var(--r-lg); font-size: var(--text-sm); background: var(--white); color: var(--text); outline: none; transition: border-color var(--t-base), box-shadow var(--t-base); box-sizing: border-box; }
+    .tx-search-input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(27,58,107,0.1); }
+    .tx-search-input::placeholder { color: var(--muted); }
 
     .tx-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--r-xl); margin-bottom: 0.9rem; overflow: hidden; transition: box-shadow var(--t-base), border-color var(--t-base); }
     .tx-card:hover { box-shadow: var(--shadow); border-color: var(--navy-subtle2); }
@@ -1633,6 +1658,7 @@
       .app-nav { padding:0 1rem; }
       /* Dashboard */
       #view-dashboard { padding:1.5rem 4%; }
+      .dash-alerts-cols { grid-template-columns: 1fr; }
       .dash-stats { gap:.6rem; }
       .dash-stat { min-width:calc(50% - .3rem); padding:.8rem 1rem; }
       .dash-stat-val { font-size:1.2rem; }
@@ -2156,6 +2182,25 @@
         <div class="dash-stat"><div class="dash-stat-lbl">Net Earned YTD</div><div class="dash-stat-val" id="ds-earned">—</div><div class="dash-stat-sub">this year</div></div>
         <div class="dash-stat"><div class="dash-stat-lbl">Outstanding</div><div class="dash-stat-val" id="ds-outstanding">—</div><div class="dash-stat-sub">unpaid commissions</div></div>
         <div class="dash-stat"><div class="dash-stat-lbl">Active Checklists</div><div class="dash-stat-val" id="ds-checklists">—</div><div class="dash-stat-sub">in progress</div></div>
+      </div>
+
+      <!-- Upcoming Dates & Alerts -->
+      <div class="dash-alerts-panel" id="dash-alerts-panel">
+        <div class="dash-alerts-title">📅 Upcoming Dates &amp; Alerts</div>
+        <div class="dash-alerts-cols">
+          <div>
+            <div class="dash-alert-col-title" style="color:var(--danger)">🔴 Overdue</div>
+            <div id="dash-alerts-overdue"><div class="dash-alert-empty">No overdue items</div></div>
+          </div>
+          <div>
+            <div class="dash-alert-col-title" style="color:var(--warning)">🟡 Upcoming Payments</div>
+            <div id="dash-alerts-upcoming"><div class="dash-alert-empty">No upcoming payments</div></div>
+          </div>
+          <div>
+            <div class="dash-alert-col-title" style="color:var(--navy)">🔵 Lease Renewals</div>
+            <div id="dash-alerts-renewals"><div class="dash-alert-empty">No renewals in next 70 days</div></div>
+          </div>
+        </div>
       </div>
 
       <div class="dash-categories">
@@ -2983,6 +3028,10 @@
         </div>
         <div class="chart-wrap"><canvas id="comm-chart"></canvas></div>
       </div>
+      <div class="tx-search-wrap">
+        <span class="tx-search-icon">🔍</span>
+        <input class="tx-search-input" id="resale-search" type="text" placeholder="Search by address or client name…" oninput="resaleSearch=this.value; renderTxList()" />
+      </div>
       <div class="tx-header">
         <div class="tx-header-title">Transactions</div>
         <div class="tx-count" id="tx-count">—</div>
@@ -3032,6 +3081,10 @@
         </div>
         <div class="chart-wrap"><canvas id="pre-comm-chart"></canvas></div>
       </div>
+      <div class="tx-search-wrap">
+        <span class="tx-search-icon">🔍</span>
+        <input class="tx-search-input" id="pre-search" type="text" placeholder="Search by project or client name…" oninput="preSearch=this.value; renderPreList()" />
+      </div>
       <div class="tx-header">
         <div class="tx-header-title">Projects</div>
         <div class="tx-count" id="pre-tx-count">—</div>
@@ -3075,6 +3128,10 @@
         <div class="chart-wrap"><canvas id="lease-comm-chart"></canvas></div>
       </div>
 
+      <div class="tx-search-wrap">
+        <span class="tx-search-icon">🔍</span>
+        <input class="tx-search-input" id="lease-search" type="text" placeholder="Search by address or client name…" oninput="leaseSearch=this.value; renderLeaseList()" />
+      </div>
       <div class="tx-header">
         <div class="tx-header-title">Transactions</div>
         <div class="tx-count" id="lease-tx-count">—</div>
@@ -3825,6 +3882,9 @@ let memberCount    = 0;
 let editingTxId    = null;
 let editingPreId   = null;
 let editingLeaseId = null;
+let resaleSearch   = '';
+let preSearch      = '';
+let leaseSearch    = '';
 
 /* ─── UTILS ─── */
 const $     = id => document.getElementById(id);
@@ -5652,7 +5712,7 @@ function renderYearTabs() {
   ).join('');
 }
 
-function pickYear(y) { selectedYear = y; renderYearTabs(); renderSummary(); renderChart(); renderTxList(); }
+function pickYear(y) { selectedYear = y; resaleSearch = ''; if ($('resale-search')) $('resale-search').value = ''; renderYearTabs(); renderSummary(); renderChart(); renderTxList(); }
 
 function renderSummary() {
   const list = filtered();
@@ -5703,14 +5763,21 @@ function renderChart() {
 }
 
 function renderTxList() {
-  const list = [...filtered()].sort((a,b) => new Date(b.closingDate)-new Date(a.closingDate));
+  const q    = resaleSearch.trim().toLowerCase();
+  const list = [...filtered()]
+    .filter(t => !q
+      || (t.address    || '').toLowerCase().includes(q)
+      || (t.clientName || '').toLowerCase().includes(q))
+    .sort((a,b) => new Date(b.closingDate)-new Date(a.closingDate));
   const el   = $('tx-list');
   $('tx-count').textContent = `${list.length} transaction${list.length!==1?'s':''}`;
-  const draftsHTML = resaleDrafts.length
+  const draftsHTML = (!q && resaleDrafts.length)
     ? `<div class="draft-section-hdr">✏ Drafts (${resaleDrafts.length})</div>${resaleDrafts.map(d => draftCardHTML(d,'resale')).join('')}`
     : '';
   if (!list.length) {
-    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">📋</div><h3>No transactions yet</h3><p>Click "Add Transaction" to record your first resale commission for ${selectedYear}.</p></div>`;
+    el.innerHTML = draftsHTML + (q
+      ? `<div class="empty-state"><div class="empty-icon">🔍</div><h3>No results for "${escHtml(q)}"</h3><p>Try a different name or address.</p></div>`
+      : `<div class="empty-state"><div class="empty-icon">📋</div><h3>No transactions yet</h3><p>Click "Add Transaction" to record your first resale commission for ${selectedYear}.</p></div>`);
     return;
   }
   el.innerHTML = draftsHTML + list.map(txCardHTML).join('');
@@ -6240,7 +6307,7 @@ function renderPreYearTabs() {
   ).join('');
 }
 
-function pickPreYear(y) { preYear = y; renderPreYearTabs(); renderPreSummary(); renderPreChart(); renderPreList(); }
+function pickPreYear(y) { preYear = y; preSearch = ''; if ($('pre-search')) $('pre-search').value = ''; renderPreYearTabs(); renderPreSummary(); renderPreChart(); renderPreList(); }
 
 function renderPreSummary() {
   const list = filteredPre();
@@ -6389,14 +6456,21 @@ function renderPreChart() {
 }
 
 function renderPreList() {
-  const list = [...filteredPre()].sort((a, b) => new Date(b.purchaseDate) - new Date(a.purchaseDate));
+  const q    = preSearch.trim().toLowerCase();
+  const list = [...filteredPre()]
+    .filter(p => !q
+      || (p.projectName || '').toLowerCase().includes(q)
+      || (p.clientName  || '').toLowerCase().includes(q))
+    .sort((a, b) => new Date(b.purchaseDate) - new Date(a.purchaseDate));
   const el   = $('pre-tx-list');
   $('pre-tx-count').textContent = `${list.length} project${list.length !== 1 ? 's' : ''}`;
-  const draftsHTML = preDrafts.length
+  const draftsHTML = (!q && preDrafts.length)
     ? `<div class="draft-section-hdr">✏ Drafts (${preDrafts.length})</div>${preDrafts.map(d => draftCardHTML(d,'pre')).join('')}`
     : '';
   if (!list.length) {
-    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">🏗️</div><h3>No preconstruction projects yet</h3><p>Click "Add Transaction" to log your first preconstruction deal for ${preYear}.</p></div>`;
+    el.innerHTML = draftsHTML + (q
+      ? `<div class="empty-state"><div class="empty-icon">🔍</div><h3>No results for "${escHtml(q)}"</h3><p>Try a different project or client name.</p></div>`
+      : `<div class="empty-state"><div class="empty-icon">🏗️</div><h3>No preconstruction projects yet</h3><p>Click "Add Transaction" to log your first preconstruction deal for ${preYear}.</p></div>`);
     return;
   }
   el.innerHTML = draftsHTML + list.map(preCardHTML).join('');
@@ -7244,7 +7318,7 @@ function renderLeaseYearTabs() {
   ).join('');
 }
 
-function pickLeaseYear(y) { leaseYear = y; renderLeaseYearTabs(); renderLeaseSummary(); renderLeaseChart(); renderLeaseList(); }
+function pickLeaseYear(y) { leaseYear = y; leaseSearch = ''; if ($('lease-search')) $('lease-search').value = ''; renderLeaseYearTabs(); renderLeaseSummary(); renderLeaseChart(); renderLeaseList(); }
 
 function setLeaseFilter(f) {
   leaseFilter = f;
@@ -7321,14 +7395,21 @@ function renderLeaseChart() {
 }
 
 function renderLeaseList() {
-  const list = [...filteredLease()].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+  const q    = leaseSearch.trim().toLowerCase();
+  const list = [...filteredLease()]
+    .filter(l => !q
+      || (l.address    || '').toLowerCase().includes(q)
+      || (l.clientName || '').toLowerCase().includes(q))
+    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const el   = $('lease-tx-list');
   $('lease-tx-count').textContent = `${list.length} transaction${list.length !== 1 ? 's' : ''}`;
-  const draftsHTML = leaseDrafts.length
+  const draftsHTML = (!q && leaseDrafts.length)
     ? `<div class="draft-section-hdr">✏ Drafts (${leaseDrafts.length})</div>${leaseDrafts.map(d => draftCardHTML(d,'lease')).join('')}`
     : '';
   if (!list.length) {
-    el.innerHTML = draftsHTML + `<div class="empty-state"><div class="empty-icon">🔑</div><h3>No lease transactions yet</h3><p>Click "Add Transaction" to log your first lease deal for ${leaseYear}.</p></div>`;
+    el.innerHTML = draftsHTML + (q
+      ? `<div class="empty-state"><div class="empty-icon">🔍</div><h3>No results for "${escHtml(q)}"</h3><p>Try a different address or client name.</p></div>`
+      : `<div class="empty-state"><div class="empty-icon">🔑</div><h3>No lease transactions yet</h3><p>Click "Add Transaction" to log your first lease deal for ${leaseYear}.</p></div>`);
     return;
   }
   el.innerHTML = draftsHTML + list.map(leaseCardHTML).join('');
@@ -10732,8 +10813,9 @@ function deleteCustomCol(clId, colId) {
    DASHBOARD STATS UPDATE
 ════════════════════════════════════════════ */
 function updateDashStats() {
-  // Active deals from resale + lease
-  const yr = new Date().getFullYear();
+  const yr    = new Date().getFullYear();
+  const today = new Date(); today.setHours(0,0,0,0);
+
   const resaleActive = transactions.filter(t => !t.isPaid && t.year === yr).length;
   const leaseActive  = leaseTxs.filter(t => !t.isPaid && Number(t.year||t.startDate?.slice(0,4)) === yr).length;
   const outstanding  = [...transactions,...leaseTxs].filter(t => !t.isPaid).reduce((s,t) => {
@@ -10751,6 +10833,123 @@ function updateDashStats() {
   const dsE = $('ds-earned');    if (dsE) dsE.textContent = fmtD(earned);
   const dsO = $('ds-outstanding'); if (dsO) dsO.textContent = fmtD(outstanding);
   updateDashChecklistStat();
+  renderDashAlerts(today);
+}
+
+function renderDashAlerts(today) {
+  if (!today) { today = new Date(); today.setHours(0,0,0,0); }
+  const overdue  = [];
+  const upcoming = [];
+  const renewals = [];
+
+  const shortDate = d => d.toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric' });
+  const daysFromNow = d => Math.ceil((d - today) / 86400000);
+
+  // ── Resale transactions ──────────────────────────────────────────
+  transactions.forEach(t => {
+    if (t.isPaid || !t.closingDate) return;
+    const due = paymentDue(t.closingDate);
+    const { userNet } = calcComm(t);
+    const item = {
+      label: t.address || 'Resale',
+      sub:   'Resale Commission',
+      amount: userNet,
+      date:  due,
+      nav:   () => showView('resale')
+    };
+    due < today ? overdue.push(item) : upcoming.push(item);
+  });
+
+  // ── Lease transactions ───────────────────────────────────────────
+  leaseTxs.forEach(l => {
+    if (!l.isPaid && l.startDate) {
+      const due = leaseDue(l.startDate);
+      const { userNet } = calcLeaseComm(l);
+      const item = {
+        label: l.address || 'Lease',
+        sub:   `Lease — ${l.repType === 'tenant' ? 'Tenant Rep' : 'Landlord Rep'}`,
+        amount: userNet,
+        date:  due,
+        nav:   () => showView('lease')
+      };
+      due < today ? overdue.push(item) : upcoming.push(item);
+    }
+    // Renewal countdown — only 1-year (12-month) leases, starting 70 days out
+    const term = parseInt(l.leaseTerm);
+    if (term > 0 && l.startDate) {
+      const start   = new Date(l.startDate + 'T00:00:00');
+      const renewal = new Date(start);
+      renewal.setMonth(renewal.getMonth() + term);
+      const days = daysFromNow(renewal);
+      if (days >= 0 && days <= 70) {
+        renewals.push({
+          label: l.address || 'Lease',
+          sub:   `${term}-mo lease · ${l.clientName || ''}`.trim().replace(/·\s*$/, ''),
+          date:  renewal,
+          days,
+          nav:   () => showView('lease')
+        });
+      }
+    }
+  });
+
+  // ── Preconstruction payouts ──────────────────────────────────────
+  preTxs.forEach(p => {
+    const { userNet } = calcPreComm(p);
+    const datedPayouts = (p.payouts || []).filter(x => x.date);
+    const payoutCount  = datedPayouts.length || 1;
+    const totalPct     = datedPayouts.filter(x => x.commType === 'pct').reduce((s,x) => s + (x.commValue||0), 0);
+    datedPayouts.forEach((pout, i) => {
+      if (pout.isPaid) return;
+      const due = new Date(pout.date + 'T00:00:00');
+      const amt = payoutAmt(pout, userNet, payoutCount, totalPct);
+      const item = {
+        label: p.projectName || 'Precon',
+        sub:   pout.label || `Payout ${i + 1}`,
+        amount: amt,
+        date:  due,
+        nav:   () => showView('preconstruction')
+      };
+      due < today ? overdue.push(item) : upcoming.push(item);
+    });
+  });
+
+  // Sort: overdue by oldest first, upcoming by soonest first
+  overdue.sort((a,b)  => a.date - b.date);
+  upcoming.sort((a,b) => a.date - b.date);
+  renewals.sort((a,b) => a.days - b.days);
+
+  const itemHTML = (item, cls) => `
+    <div class="dash-alert-item ${cls}" onclick="${cls === 'is-overdue' ? "showView('resale')" : ''}">
+      <div class="dash-alert-item-left">
+        <div class="dash-alert-label" title="${escHtml(item.label)}">${escHtml(item.label)}</div>
+        <div class="dash-alert-sub">${escHtml(item.sub)}</div>
+      </div>
+      <div class="dash-alert-right">
+        <div class="dash-alert-date">${shortDate(item.date)}</div>
+        <div class="dash-alert-amt">${fmt(item.amount)}</div>
+      </div>
+    </div>`;
+
+  const renewalHTML = r => `
+    <div class="dash-alert-item is-renewal" onclick="showView('lease')">
+      <div class="dash-alert-item-left">
+        <div class="dash-alert-label" title="${escHtml(r.label)}">${escHtml(r.label)}</div>
+        <div class="dash-alert-sub">${escHtml(r.sub)}</div>
+      </div>
+      <div class="dash-alert-right">
+        <div class="dash-alert-date">${shortDate(r.date)}</div>
+        <div><span class="dash-alert-countdown">${r.days === 0 ? 'Today' : r.days + 'd left'}</span></div>
+      </div>
+    </div>`;
+
+  const overdueEl  = $('dash-alerts-overdue');
+  const upcomingEl = $('dash-alerts-upcoming');
+  const renewalEl  = $('dash-alerts-renewals');
+
+  if (overdueEl)  overdueEl.innerHTML  = overdue.length  ? overdue.map(i  => itemHTML(i, 'is-overdue')).join('')   : '<div class="dash-alert-empty">No overdue items ✓</div>';
+  if (upcomingEl) upcomingEl.innerHTML = upcoming.length ? upcoming.map(i => itemHTML(i, 'is-upcoming')).join('')  : '<div class="dash-alert-empty">No upcoming payments</div>';
+  if (renewalEl)  renewalEl.innerHTML  = renewals.length ? renewals.map(r => renewalHTML(r)).join('')              : '<div class="dash-alert-empty">No renewals in next 70 days</div>';
 }
 
 function escHtml(s) {

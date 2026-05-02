@@ -5641,7 +5641,7 @@ function getYears() {
   const s = new Set(transactions.map(t => t.year));
   const cur = new Date().getFullYear();
   s.add(cur); s.add(cur - 1);
-  return [...s].sort((a,b) => b-a);
+  return [...s].sort((a,b) => a-b);
 }
 
 function filtered() { return transactions.filter(t => t.year === selectedYear); }
@@ -6229,7 +6229,7 @@ function getPreYears() {
   const s = new Set(preTxs.map(p => p.year));
   const cur = new Date().getFullYear();
   s.add(cur); s.add(cur - 1);
-  return [...s].sort((a, b) => b - a);
+  return [...s].sort((a, b) => a - b);
 }
 
 function filteredPre() { return preTxs.filter(p => p.year === preYear); }
@@ -7231,7 +7231,7 @@ function getLeaseYears() {
   const s = new Set(leaseTxs.map(l => l.year));
   const cur = new Date().getFullYear();
   s.add(cur); s.add(cur - 1);
-  return [...s].sort((a, b) => b - a);
+  return [...s].sort((a, b) => a - b);
 }
 
 function filteredLease() {

@@ -3934,7 +3934,7 @@ function renderTcYearTabs() {
       years.add(p.year);
     }
   });
-  const sorted = [...years].sort((a,b) => b-a);
+  const sorted = [...years].sort((a,b) => a-b);
   $('tc-year-tabs').innerHTML = sorted.map(y =>
     `<button class="year-tab ${y===tcYear?'active':''}" onclick="tcPickYear(${y})">${y}</button>`
   ).join('');
@@ -6167,8 +6167,11 @@ function preRowToTx(row) {
     occupancyDate: row.occupancy_date,
     commBasis:     row.comm_basis,
     commRate:      row.comm_rate,
-    commType:      row.comm_type || 'pct',
+    // If comm_type column doesn't exist yet in Supabase, auto-detect:
+    // a zero basis with a large rate is almost certainly a flat dollar amount
+    commType:      row.comm_type || ((!row.comm_basis && row.comm_rate > 100) ? 'flat' : 'pct'),
     kickback:      row.kickback,
+    kickType:      row.kick_type || 'dollar',
     brokSplit:     row.brok_split,
     teamMembers:   row.team_members || [],
     payouts:       row.payouts || [],
@@ -6188,7 +6191,9 @@ function preTxToRow(p, userId) {
     occupancy_date: p.occupancyDate || null,
     comm_basis:    p.commBasis || 0,
     comm_rate:     p.commRate  || 0,
+    comm_type:     p.commType  || 'pct',
     kickback:      p.kickback,
+    kick_type:     p.kickType  || 'dollar',
     brok_split:    p.brokSplit,
     team_members:  p.teamMembers,
     payouts:       p.payouts,
@@ -7024,7 +7029,12 @@ async function savePre() {
     };
     setLoading('btn-save-pre', true);
     if (isConfigured) {
-      const { error } = await sb.from('pre_transactions').update(preTxToRow(updated, currentUser.id)).eq('id', editingPreId);
+      const rowData = preTxToRow(updated, currentUser.id);
+      let { error } = await sb.from('pre_transactions').update(rowData).eq('id', editingPreId);
+      if (error && (error.message.includes('comm_type') || error.message.includes('kick_type'))) {
+        const { comm_type, kick_type, ...rowWithout } = rowData;
+        ({ error } = await sb.from('pre_transactions').update(rowWithout).eq('id', editingPreId));
+      }
       setLoading('btn-save-pre', false);
       if (error) { toast('Error updating: ' + error.message, 'error'); return; }
     } else {
@@ -7050,7 +7060,12 @@ async function savePre() {
   setLoading('btn-save-pre', true);
 
   if (isConfigured) {
-    const { data, error } = await sb.from('pre_transactions').insert(preTxToRow(newPre, currentUser.id)).select().single();
+    const rowData = preTxToRow(newPre, currentUser.id);
+    let { data, error } = await sb.from('pre_transactions').insert(rowData).select().single();
+    if (error && (error.message.includes('comm_type') || error.message.includes('kick_type'))) {
+      const { comm_type, kick_type, ...rowWithout } = rowData;
+      ({ data, error } = await sb.from('pre_transactions').insert(rowWithout).select().single());
+    }
     setLoading('btn-save-pre', false);
     if (error) { toast('Error saving: ' + error.message, 'error'); return; }
     preTxs.push(preRowToTx(data));
